@@ -102,7 +102,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 <!-- ---------- HTML: la struttura ---------- -->
 <main class="pagina">
   <div>
-    <div class="occhiello">Tappa 2 · Wikipedia</div>
+    <div class="occhiello">Tappa 2 · Wikipedia completa</div>
     <h1>Erbario Tascabile</h1>
   </div>
   <p class="intro">Fotografa una pianta. Finché non arriva il riconoscimento automatico, scrivi tu il nome e l'app ti porta la scheda.</p>
@@ -145,7 +145,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
       <h2 id="scheda-titolo"></h2>
     </div>
     <img id="scheda-immagine" alt="" hidden>
-    <p id="scheda-testo"></p>
+    <div id="scheda-testo"></div>
     <a id="scheda-link" target="_blank" rel="noopener">Leggi la voce completa su Wikipedia</a>
   </article>
 </main>
@@ -178,7 +178,7 @@ $("ricerca").addEventListener("submit", function (evento) {
   if (nome) cercaSuWikipedia(nome, "a mano");
 });
 
-// --- 3. IL FORNITORE: Wikipedia ---
+// --- 3. IL FORNITORE: Wikipedia (versione 2: la voce completa) ---
 // "async" vuol dire che la funzione deve ASPETTARE una risposta da internet.
 // "await" è il punto in cui aspetta, come un cameriere che attende il piatto dalla cucina.
 async function cercaSuWikipedia(nome, chiHaIdentificato) {
@@ -187,18 +187,32 @@ async function cercaSuWikipedia(nome, chiHaIdentificato) {
 
   // Proviamo prima la Wikipedia italiana, poi quella inglese (più ricca sulle piante rare).
   for (const lingua of ["it", "en"]) {
-    // Questo è l'INDIRIZZO dell'API: un URL che invece di una pagina restituisce dati.
-    // encodeURIComponent trasforma gli spazi e gli accenti in caratteri validi per un URL.
-    const indirizzo = "https://" + lingua + ".wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(nome);
+    // Il NUOVO indirizzo. Dopo il "?" ci sono le istruzioni per Wikipedia, separate da "&".
+    // Ognuna è una coppia nome=valore, come le voci di un modulo d'ordine.
+    const indirizzo = "https://" + lingua + ".wikipedia.org/w/api.php"
+      + "?action=query"                        // voglio informazioni su una pagina
+      + "&prop=extracts|pageimages|pageprops"  // cosa voglio: il testo, l'immagine, le proprietà della pagina
+      + "&explaintext=1"                       // il testo semplice, senza formattazione
+      + "&piprop=thumbnail&pithumbsize=800"    // l'immagine, larga 800 pixel
+      + "&ppprop=disambiguation"               // dimmi se è una pagina "ci sono più significati"
+      + "&redirects=1"                         // se il nome rimanda a un'altra voce, seguila
+      + "&format=json"                         // rispondi in JSON, il formato dati delle app
+      + "&origin=*"                            // permesso tecnico: ci chiama un altro sito (il nostro)
+      + "&titles=" + encodeURIComponent(nome); // il nome cercato, con spazi e accenti resi validi
 
     try {
-      const risposta = await fetch(indirizzo);     // 1) mandiamo la richiesta e aspettiamo
-      if (!risposta.ok) continue;                  // 2) se la voce non esiste (errore 404), proviamo l'altra lingua
-      const dati = await risposta.json();          // 3) trasformiamo la risposta in dati utilizzabili
-      if (dati.type === "disambiguation") continue; // pagina "ci sono più significati": non ci serve
+      const risposta = await fetch(indirizzo);   // 1) mandiamo la richiesta e aspettiamo
+      const dati = await risposta.json();        // 2) trasformiamo la risposta in dati utilizzabili
 
-      mostraScheda(dati, lingua, chiHaIdentificato);
-      return;                                      // trovato: usciamo dalla funzione
+      // 3) Wikipedia mette la pagina dentro dati.query.pages, sotto un numero che non
+      //    conosciamo in anticipo. Object.values(...)[0] vuol dire "prendi il primo, qualunque sia il suo nome".
+      const pagina = Object.values(dati.query.pages)[0];
+
+      if (pagina.missing !== undefined) continue;  // la voce non esiste: proviamo l'altra lingua
+      if (pagina.pageprops && pagina.pageprops.disambiguation !== undefined) continue; // più significati: non ci serve
+
+      mostraScheda(pagina, lingua, chiHaIdentificato);
+      return;                                    // trovato: usciamo dalla funzione
     } catch (errore) {
       mostraStato("Non riesco a contattare Wikipedia. Controlla la connessione e riprova.", true);
       return;
@@ -208,26 +222,60 @@ async function cercaSuWikipedia(nome, chiHaIdentificato) {
 }
 
 // --- 4. METTERE I DATI NELLA PAGINA ---
-// "dati" è un oggetto con dentro i campi che Wikipedia ci restituisce:
-// dati.title (titolo), dati.extract (riassunto), dati.thumbnail.source (immagine)...
-function mostraScheda(dati, lingua, chiHaIdentificato) {
-  $("stato").hidden = true;
-  $("scheda-titolo").textContent = dati.title;
-  $("scheda-sottotitolo").textContent = dati.description || ("Wikipedia " + lingua.toUpperCase());
-  $("scheda-testo").textContent = dati.extract;
-  $("scheda-link").href = dati.content_urls.mobile.page;
+// Le sezioni di Wikipedia che non c'entrano con la pianta: le saltiamo.
+const SEZIONI_DA_SALTARE = ["Note", "Bibliografia", "Voci correlate", "Altri progetti", "Collegamenti esterni",
+  "Galleria d'immagini", "References", "See also", "External links", "Further reading", "Gallery", "Notes"];
 
-  if (dati.thumbnail) {
-    $("scheda-immagine").src = dati.thumbnail.source;
-    $("scheda-immagine").alt = dati.title;
+function mostraScheda(pagina, lingua, chiHaIdentificato) {
+  $("stato").hidden = true;
+  $("scheda-titolo").textContent = pagina.title;
+  $("scheda-sottotitolo").textContent = "Wikipedia " + lingua.toUpperCase();
+  $("scheda-link").href = "https://" + lingua + ".m.wikipedia.org/wiki/" + encodeURIComponent(pagina.title.replaceAll(" ", "_"));
+
+  if (pagina.thumbnail) {
+    $("scheda-immagine").src = pagina.thumbnail.source;
+    $("scheda-immagine").alt = pagina.title;
     $("scheda-immagine").hidden = false;
   } else {
     $("scheda-immagine").hidden = true;
   }
 
-  $("specie").textContent = dati.title;
+  // Il testo arriva tutto attaccato, con i titoli delle sezioni scritti così:  == Descrizione ==
+  // "split" lo taglia in pezzi ogni volta che trova un titolo. Il risultato è una lista:
+  // [introduzione, titolo 1, testo 1, titolo 2, testo 2, ...]
+  const pezzi = pagina.extract.split(/\n*={2,}\s*(.+?)\s*={2,}\n*/);
+
+  const contenitore = $("scheda-testo");
+  contenitore.replaceChildren();          // svuotiamo la scheda della ricerca precedente
+  aggiungiParagrafi(contenitore, pezzi[0]); // l'introduzione, sempre visibile
+
+  // Poi ogni sezione, dentro un <details>: un elemento HTML che si apre e si chiude toccandolo.
+  for (let i = 1; i < pezzi.length; i = i + 2) {
+    const titolo = pezzi[i];
+    const testo = (pezzi[i + 1] || "").trim();
+    if (testo === "" || SEZIONI_DA_SALTARE.includes(titolo)) continue;
+
+    const sezione = document.createElement("details");   // creiamo un elemento nuovo...
+    const etichetta = document.createElement("summary"); // ...con la sua etichetta cliccabile
+    etichetta.textContent = titolo;
+    sezione.append(etichetta);
+    aggiungiParagrafi(sezione, testo);
+    contenitore.append(sezione);                         // ...e lo mettiamo nella pagina
+  }
+
+  $("specie").textContent = pagina.title;
   $("det").textContent = chiHaIdentificato;
   $("scheda").hidden = false;
+}
+
+// Trasforma un blocco di testo in paragrafi, uno per ogni "a capo".
+function aggiungiParagrafi(dove, testo) {
+  for (const riga of testo.split("\n")) {
+    if (riga.trim() === "") continue;
+    const paragrafo = document.createElement("p");
+    paragrafo.textContent = riga;
+    dove.append(paragrafo);
+  }
 }
 
 function mostraStato(messaggio, eUnErrore = false) {
