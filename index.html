@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Erbario Tascabile</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<!--
+  ============================================================
+  ERBARIO TASCABILE · Tappa 2: il primo fornitore (Wikipedia)
+  ============================================================
+  Novità rispetto alla tappa 1:
+   - un campo dove scrivere il nome di una pianta
+   - la funzione cercaSuWikipedia(), che "ordina" la scheda a Wikipedia
+  Questo file si chiama index.html: è il nome che i siti usano
+  per la pagina principale. GitHub Pages lo apre da solo.
+-->
+
+<style>
+/* ---------- CSS: l'aspetto (uguale alla tappa 1, più la scheda) ---------- */
+:root {
+  --carta: #f3f5ef; --inchiostro: #1d2a22; --clorofilla: #2f6b3f;
+  --linfa: #e4ebdf; --matita: #6b776e; --bordo: #c9d3c6; --errore: #9a3b2e;
+  --f-titolo: "Young Serif", Georgia, serif;
+  --f-testo: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --f-etichetta: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --carta: #141b16; --inchiostro: #e3eae1; --clorofilla: #7fbf8c;
+    --linfa: #1f2a22; --matita: #9aa79d; --bordo: #33433a; --errore: #e08a7a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--carta); color: var(--inchiostro);
+  font-family: var(--f-testo); font-size: 1rem; line-height: 1.55;
+}
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+.pagina {
+  max-width: 30rem; margin: 0 auto;
+  padding-block: max(2rem, env(safe-area-inset-top, 0px)) 3rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 1.5rem;
+}
+.occhiello { font-family: var(--f-etichetta); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--matita); }
+h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-height: 1.05; margin: .25rem 0 0; }
+.intro { color: var(--matita); margin: 0; }
+
+.cornice { aspect-ratio: 4 / 5; border: 1.5px dashed var(--bordo); border-radius: 4px; background: var(--linfa); display: grid; place-items: center; overflow: hidden; }
+.cornice img { width: 100%; height: 100%; object-fit: cover; }
+.cornice.piena { border-style: solid; border-color: var(--inchiostro); }
+.vuoto { text-align: center; color: var(--matita); padding: 1.5rem; }
+.vuoto svg { width: 4.5rem; height: 4.5rem; stroke: var(--clorofilla); fill: none; stroke-width: 1.4; }
+
+#scatto { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.bottone {
+  display: flex; align-items: center; justify-content: center; gap: .6rem;
+  background: var(--clorofilla); color: var(--carta); border: 0;
+  font: 700 1.05rem var(--f-testo); padding: 1rem 1.25rem; border-radius: 999px; cursor: pointer;
+}
+.bottone svg { width: 1.3rem; height: 1.3rem; stroke: currentColor; fill: none; stroke-width: 2; }
+#scatto:focus-visible + .bottone, .bottone:focus-visible { outline: 3px solid var(--inchiostro); outline-offset: 3px; }
+
+/* La ricerca per nome */
+.ricerca { display: flex; gap: .5rem; }
+.ricerca input {
+  flex: 1; min-width: 0; font: 1rem var(--f-testo); padding: .8rem 1rem;
+  border: 1.5px solid var(--bordo); border-radius: 999px; background: var(--carta); color: var(--inchiostro);
+}
+.ricerca input:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: 1px; }
+.ricerca .bottone { padding: .8rem 1.2rem; font-size: 1rem; }
+
+/* Il cartellino d'erbario */
+.cartellino { border: 1.5px solid var(--inchiostro); border-radius: 2px; font-family: var(--f-etichetta); font-size: .82rem; }
+.cartellino header { border-bottom: 1.5px solid var(--inchiostro); padding: .5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; letter-spacing: .1em; text-transform: uppercase; font-size: .7rem; }
+.cartellino dl { margin: 0; display: grid; grid-template-columns: auto 1fr; }
+.cartellino dt, .cartellino dd { padding: .5rem .8rem; border-bottom: 1px solid var(--bordo); margin: 0; }
+.cartellino dt { color: var(--matita); text-transform: uppercase; font-size: .68rem; letter-spacing: .08em; align-self: center; }
+.cartellino dd { min-width: 0; overflow-wrap: anywhere; }
+.cartellino dl > :nth-last-child(-n+2) { border-bottom: 0; }
+.specie { font-family: var(--f-titolo); font-size: 1.05rem; font-style: italic; }
+
+/* La scheda che arriva da Wikipedia */
+.scheda { display: flex; flex-direction: column; gap: .75rem; }
+.scheda h2 { font-family: var(--f-titolo); font-weight: 400; font-size: 1.6rem; margin: 0; line-height: 1.15; }
+.scheda .sottotitolo { font-family: var(--f-etichetta); font-size: .75rem; color: var(--matita); text-transform: uppercase; letter-spacing: .08em; }
+.scheda img { border-radius: 4px; border: 1px solid var(--bordo); max-height: 18rem; object-fit: cover; width: 100%; }
+.scheda p { margin: 0; }
+.scheda a { color: var(--clorofilla); font-weight: 700; }
+.stato { font-size: .9rem; color: var(--matita); margin: 0; }
+.stato.errore { color: var(--errore); }
+</style>
+</head>
+
+<body>
+<!-- ---------- HTML: la struttura ---------- -->
+<main class="pagina">
+  <div>
+    <div class="occhiello">Tappa 2 · Wikipedia</div>
+    <h1>Erbario Tascabile</h1>
+  </div>
+  <p class="intro">Fotografa una pianta. Finché non arriva il riconoscimento automatico, scrivi tu il nome e l'app ti porta la scheda.</p>
+
+  <div class="cornice" id="cornice">
+    <div class="vuoto" id="vuoto">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 58V26"/><path d="M32 40c-10 0-16-6-17-16 10 0 16 6 17 16z"/><path d="M32 30c0-10 6-17 17-18 0 11-6 17-17 18z"/></svg>
+      <p>Nessun esemplare ancora</p>
+    </div>
+    <img id="foto" alt="La pianta fotografata" hidden>
+  </div>
+
+  <input type="file" id="scatto" accept="image/*" capture="environment">
+  <label for="scatto" class="bottone">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    <span id="testo-bottone">Fotografa una pianta</span>
+  </label>
+
+  <!-- NOVITÀ: un modulo (form) con un campo di testo e un bottone -->
+  <form class="ricerca" id="ricerca">
+    <input id="nome" type="text" placeholder="Es. Pistacia lentiscus o rosmarino" aria-label="Nome della pianta" autocomplete="off">
+    <button class="bottone" type="submit">Cerca</button>
+  </form>
+
+  <section class="cartellino" aria-label="Cartellino dell'esemplare">
+    <header><span>Herbarium</span><span id="numero">N° —</span></header>
+    <dl>
+      <dt>Specie</dt><dd class="specie" id="specie">in attesa di identificazione</dd>
+      <dt>Raccolta</dt><dd id="data">—</dd>
+      <dt>Det.</dt><dd id="det">—</dd>
+    </dl>
+  </section>
+
+  <p class="stato" id="stato" hidden></p>
+
+  <!-- NOVITÀ: qui compare la scheda che arriva da Wikipedia -->
+  <article class="scheda" id="scheda" hidden>
+    <div>
+      <div class="sottotitolo" id="scheda-sottotitolo"></div>
+      <h2 id="scheda-titolo"></h2>
+    </div>
+    <img id="scheda-immagine" alt="" hidden>
+    <p id="scheda-testo"></p>
+    <a id="scheda-link" target="_blank" rel="noopener">Leggi la voce completa su Wikipedia</a>
+  </article>
+</main>
+
+<script>
+// ---------- JavaScript: il comportamento ----------
+
+const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece di document.getElementById("foto")
+let contatore = 0;
+
+// --- 1. LA FOTO (identica alla tappa 1) ---
+$("scatto").addEventListener("change", function () {
+  const file = $("scatto").files[0];
+  if (!file) return;
+  $("foto").src = URL.createObjectURL(file);
+  $("foto").hidden = false;
+  $("vuoto").hidden = true;
+  $("cornice").classList.add("piena");
+  contatore = contatore + 1;
+  $("numero").textContent = "N° " + String(contatore).padStart(3, "0");
+  $("data").textContent = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  $("testo-bottone").textContent = "Fotografa un'altra pianta";
+  // Tappa 3: qui manderemo la foto a Pl@ntNet, che chiamerà cercaSuWikipedia() da solo.
+});
+
+// --- 2. LA RICERCA PER NOME ---
+$("ricerca").addEventListener("submit", function (evento) {
+  evento.preventDefault();          // impedisce alla pagina di ricaricarsi (comportamento antico dei moduli)
+  const nome = $("nome").value.trim();
+  if (nome) cercaSuWikipedia(nome, "a mano");
+});
+
+// --- 3. IL FORNITORE: Wikipedia ---
+// "async" vuol dire che la funzione deve ASPETTARE una risposta da internet.
+// "await" è il punto in cui aspetta, come un cameriere che attende il piatto dalla cucina.
+async function cercaSuWikipedia(nome, chiHaIdentificato) {
+  mostraStato("Cerco «" + nome + "» su Wikipedia…");
+  $("scheda").hidden = true;
+
+  // Proviamo prima la Wikipedia italiana, poi quella inglese (più ricca sulle piante rare).
+  for (const lingua of ["it", "en"]) {
+    // Questo è l'INDIRIZZO dell'API: un URL che invece di una pagina restituisce dati.
+    // encodeURIComponent trasforma gli spazi e gli accenti in caratteri validi per un URL.
+    const indirizzo = "https://" + lingua + ".wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(nome);
+
+    try {
+      const risposta = await fetch(indirizzo);     // 1) mandiamo la richiesta e aspettiamo
+      if (!risposta.ok) continue;                  // 2) se la voce non esiste (errore 404), proviamo l'altra lingua
+      const dati = await risposta.json();          // 3) trasformiamo la risposta in dati utilizzabili
+      if (dati.type === "disambiguation") continue; // pagina "ci sono più significati": non ci serve
+
+      mostraScheda(dati, lingua, chiHaIdentificato);
+      return;                                      // trovato: usciamo dalla funzione
+    } catch (errore) {
+      mostraStato("Non riesco a contattare Wikipedia. Controlla la connessione e riprova.", true);
+      return;
+    }
+  }
+  mostraStato("Nessuna voce trovata per «" + nome + "». Prova con il nome scientifico, per esempio «Laurus nobilis».", true);
+}
+
+// --- 4. METTERE I DATI NELLA PAGINA ---
+// "dati" è un oggetto con dentro i campi che Wikipedia ci restituisce:
+// dati.title (titolo), dati.extract (riassunto), dati.thumbnail.source (immagine)...
+function mostraScheda(dati, lingua, chiHaIdentificato) {
+  $("stato").hidden = true;
+  $("scheda-titolo").textContent = dati.title;
+  $("scheda-sottotitolo").textContent = dati.description || ("Wikipedia " + lingua.toUpperCase());
+  $("scheda-testo").textContent = dati.extract;
+  $("scheda-link").href = dati.content_urls.mobile.page;
+
+  if (dati.thumbnail) {
+    $("scheda-immagine").src = dati.thumbnail.source;
+    $("scheda-immagine").alt = dati.title;
+    $("scheda-immagine").hidden = false;
+  } else {
+    $("scheda-immagine").hidden = true;
+  }
+
+  $("specie").textContent = dati.title;
+  $("det").textContent = chiHaIdentificato;
+  $("scheda").hidden = false;
+}
+
+function mostraStato(messaggio, eUnErrore = false) {
+  $("stato").textContent = messaggio;
+  $("stato").classList.toggle("errore", eUnErrore);
+  $("stato").hidden = false;
+}
+</script>
+</body>
+</html>
