@@ -113,6 +113,13 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .candidato .comune { grid-column: 1 / -1; font-size: .85rem; color: var(--matita); }
 .barra { grid-column: 1 / -1; height: 4px; background: var(--linfa); border-radius: 2px; overflow: hidden; }
 .barra span { display: block; height: 100%; background: var(--clorofilla); }
+
+/* NOVITÀ: nome comune e traduzione */
+.scheda .nome-comune { font-size: 1.05rem; margin-top: .2rem; }
+.in-traduzione { opacity: .5; }
+.scheda details { border-top: 1px solid var(--bordo); padding-block: .6rem; }
+.scheda summary { cursor: pointer; font-weight: 700; }
+.scheda details p { margin-top: .5rem; }
 </style>
 </head>
 
@@ -149,6 +156,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <header><span>Herbarium</span><span id="numero">N° —</span></header>
     <dl>
       <dt>Specie</dt><dd class="specie" id="specie">in attesa di identificazione</dd>
+      <dt>Nome comune</dt><dd id="comune">—</dd>
       <dt>Raccolta</dt><dd id="data">—</dd>
       <dt>Det.</dt><dd id="det">—</dd>
     </dl>
@@ -167,6 +175,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <div>
       <div class="sottotitolo" id="scheda-sottotitolo"></div>
       <h2 id="scheda-titolo"></h2>
+      <div class="nome-comune" id="scheda-comune" hidden></div>
     </div>
     <img id="scheda-immagine" alt="" hidden>
     <div id="scheda-testo"></div>
@@ -186,6 +195,7 @@ const CHIAVE_PLANTNET = "2b10Q5N1LnGqG4slrSCYHQ9jO";
 
 const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece di document.getElementById("foto")
 let contatore = 0;
+let nomeComune = "";   // NOVITÀ: il nome comune che ci dà Pl@ntNet, da mostrare nella scheda
 
 // --- 1. LA FOTO ---
 $("scatto").addEventListener("change", function () {
@@ -200,6 +210,7 @@ $("scatto").addEventListener("change", function () {
   $("data").textContent = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
   $("testo-bottone").textContent = "Fotografa un'altra pianta";
   $("specie").textContent = "in attesa di identificazione";
+  $("comune").textContent = "—";
   $("det").textContent = "—";
 
   identificaConPlantNet(file);   // NOVITÀ: la sala chiede alla cucina di lavorare
@@ -211,6 +222,8 @@ $("ricerca").addEventListener("submit", function (evento) {
   const nome = $("nome").value.trim();
   if (!nome) return;
   $("ipotesi").hidden = true;       // le ipotesi della foto non c'entrano con una ricerca a mano
+  nomeComune = "";                  // a mano non abbiamo il nome comune di Pl@ntNet
+  $("comune").textContent = "—";
   cercaSuWikipedia(nome, "a mano");
 });
 
@@ -285,6 +298,9 @@ function mostraIpotesi(risultati) {
 function scegliIpotesi(ipotesi, posizione) {
   document.querySelectorAll(".candidato").forEach(function (b, i) { b.classList.toggle("scelto", i === posizione); });
   const percentuale = Math.round(ipotesi.score * 100);
+  // NOVITÀ: i nomi comuni arrivano da Pl@ntNet in una lista; ne teniamo al massimo tre.
+  nomeComune = ipotesi.species.commonNames.slice(0, 3).join(", ");
+  $("comune").textContent = nomeComune || "non disponibile";
   // Cerchiamo su Wikipedia col nome scientifico: è unico al mondo, i nomi comuni no.
   cercaSuWikipedia(ipotesi.species.scientificNameWithoutAuthor, "Pl@ntNet, " + percentuale + "%");
 }
@@ -356,9 +372,14 @@ const SEZIONI_DA_SALTARE = ["Note", "Bibliografia", "Voci correlate", "Altri pro
   "Galleria d'immagini", "References", "See also", "External links", "Further reading", "Gallery", "Notes"];
 
 function mostraScheda(pagina, lingua, chiHaIdentificato) {
+  // NOVITÀ: se la voce arriva dalla Wikipedia inglese, la traduciamo.
+  const daTradurre = (lingua === "en");
+
   $("stato").hidden = true;
   $("scheda-titolo").textContent = pagina.title;
-  $("scheda-sottotitolo").textContent = "Wikipedia " + lingua.toUpperCase();
+  $("scheda-sottotitolo").textContent = daTradurre ? "Wikipedia EN · tradotto automaticamente" : "Wikipedia IT";
+  $("scheda-comune").textContent = "Nome comune: " + nomeComune;
+  $("scheda-comune").hidden = (nomeComune === "");
   $("scheda-link").href = "https://" + lingua + ".m.wikipedia.org/wiki/" + encodeURIComponent(pagina.title.replaceAll(" ", "_"));
 
   if (pagina.thumbnail) {
@@ -376,7 +397,7 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
 
   const contenitore = $("scheda-testo");
   contenitore.replaceChildren();          // svuotiamo la scheda della ricerca precedente
-  aggiungiParagrafi(contenitore, pezzi[0]); // l'introduzione, sempre visibile
+  aggiungiParagrafi(contenitore, pezzi[0], daTradurre); // l'introduzione, sempre visibile (tradotta subito)
 
   // Poi ogni sezione, dentro un <details>: un elemento HTML che si apre e si chiude toccandolo.
   for (let i = 1; i < pezzi.length; i = i + 2) {
@@ -388,8 +409,19 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
     const etichetta = document.createElement("summary"); // ...con la sua etichetta cliccabile
     etichetta.textContent = titolo;
     sezione.append(etichetta);
-    aggiungiParagrafi(sezione, testo);
+    aggiungiParagrafi(sezione, testo, false);
     contenitore.append(sezione);                         // ...e lo mettiamo nella pagina
+
+    if (daTradurre) {
+      traduciInPagina(etichetta, titolo);                // il titolo della sezione lo traduciamo subito
+      // Il testo della sezione invece SOLO quando la apri (evento "toggle"):
+      // così non sprechiamo traduzioni su sezioni che magari non leggerai.
+      sezione.addEventListener("toggle", function () {
+        if (!sezione.open || sezione.dataset.tradotta) return;
+        sezione.dataset.tradotta = "sì";
+        sezione.querySelectorAll("p").forEach(function (p) { traduciInPagina(p, p.textContent); });
+      });
+    }
   }
 
   $("specie").textContent = pagina.title;
@@ -398,13 +430,81 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
 }
 
 // Trasforma un blocco di testo in paragrafi, uno per ogni "a capo".
-function aggiungiParagrafi(dove, testo) {
+// Se daTradurre è vero, ogni paragrafo viene anche mandato al traduttore.
+function aggiungiParagrafi(dove, testo, daTradurre) {
   for (const riga of testo.split("\n")) {
     if (riga.trim() === "") continue;
     const paragrafo = document.createElement("p");
-    paragrafo.textContent = riga;
+    paragrafo.textContent = riga;     // intanto mostriamo l'inglese...
     dove.append(paragrafo);
+    if (daTradurre) traduciInPagina(paragrafo, riga);   // ...che poi viene sostituito dall'italiano
   }
+}
+
+// --- 5. IL TERZO FORNITORE: il traduttore MyMemory ---
+// Gratuito e senza chiave, ma con due limiti da rispettare:
+//  - ogni richiesta può contenere al massimo 500 byte di testo (circa 500 lettere);
+//  - circa 5.000 caratteri tradotti al giorno.
+// Per questo tagliamo il testo in pezzi e ricordiamo ciò che abbiamo già tradotto.
+
+const memoriaTraduzioni = new Map();   // una "rubrica": testo inglese → testo italiano
+
+async function traduciInPagina(elemento, testo) {
+  elemento.classList.add("in-traduzione");   // sbiadito mentre aspettiamo
+  try {
+    elemento.textContent = await traduci(testo);
+  } catch (errore) {
+    // Traduzione non riuscita (di solito: limite giornaliero finito). Lasciamo l'inglese.
+    $("scheda-sottotitolo").textContent = "Wikipedia EN · traduzione non disponibile ora, testo originale";
+  }
+  elemento.classList.remove("in-traduzione");
+}
+
+async function traduci(testo) {
+  if (memoriaTraduzioni.has(testo)) return memoriaTraduzioni.get(testo);  // già tradotto: niente richiesta
+
+  let risultato = "";
+  for (const pezzo of tagliaInPezzi(testo, 450)) {
+    const indirizzo = "https://api.mymemory.translated.net/get?langpair=en|it&q=" + encodeURIComponent(pezzo);
+    const risposta = await fetch(indirizzo);
+    const dati = await risposta.json();
+    const tradotto = dati.responseData ? dati.responseData.translatedText : "";
+    // Quando il limite è finito, MyMemory risponde con un avviso al posto della traduzione.
+    if (Number(dati.responseStatus) !== 200 || !tradotto || tradotto.startsWith("MYMEMORY WARNING")) {
+      throw new Error("traduzione non disponibile");
+    }
+    risultato = risultato + decodifica(tradotto) + " ";
+  }
+  risultato = risultato.trim();
+  memoriaTraduzioni.set(testo, risultato);
+  return risultato;
+}
+
+// Taglia un testo in pezzi sotto il limite, senza spezzare le frasi
+// (e, se una frase da sola è troppo lunga, spezzandola tra una parola e l'altra).
+function tagliaInPezzi(testo, limite) {
+  const byte = (s) => new TextEncoder().encode(s).length;
+  const frasi = testo.match(/[^.!?]+[.!?]*\s*/g) || [testo];
+  const unita = [];
+  for (const frase of frasi) {
+    if (byte(frase) <= limite) unita.push(frase);
+    else unita.push(...frase.split(/(?<=\s)/));   // parola per parola
+  }
+  const pezzi = [];
+  let attuale = "";
+  for (const u of unita) {
+    if (attuale && byte(attuale + u) > limite) { pezzi.push(attuale); attuale = ""; }
+    attuale = attuale + u;
+  }
+  if (attuale.trim()) pezzi.push(attuale);
+  return pezzi;
+}
+
+// A volte la traduzione arriva con simboli in codice (es. &#39; al posto dell'apostrofo): li riportiamo normali.
+function decodifica(s) {
+  const t = document.createElement("textarea");
+  t.innerHTML = s;
+  return t.value;
 }
 
 function mostraStato(messaggio, eUnErrore = false) {
