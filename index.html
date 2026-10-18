@@ -95,6 +95,24 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .scheda a { color: var(--clorofilla); font-weight: 700; }
 .stato { font-size: .9rem; color: var(--matita); margin: 0; }
 .stato.errore { color: var(--errore); }
+
+/* NOVITÀ tappa 3: le ipotesi di Pl@ntNet, come pulsanti con la percentuale */
+.ipotesi { display: flex; flex-direction: column; gap: .5rem; }
+.ipotesi h3 { font-family: var(--f-etichetta); font-weight: 500; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--matita); margin: 0; }
+.candidato {
+  display: grid; grid-template-columns: 1fr auto; gap: .15rem 1rem; align-items: baseline;
+  text-align: left; width: 100%; cursor: pointer;
+  background: var(--carta); color: var(--inchiostro);
+  border: 1.5px solid var(--bordo); border-radius: 6px; padding: .65rem .85rem;
+  font: inherit;
+}
+.candidato.scelto { border-color: var(--clorofilla); background: var(--linfa); }
+.candidato:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: 2px; }
+.candidato .latino { font-family: var(--f-titolo); font-style: italic; min-width: 0; overflow-wrap: anywhere; }
+.candidato .punteggio { font-family: var(--f-etichetta); font-variant-numeric: tabular-nums; color: var(--clorofilla); font-weight: 500; }
+.candidato .comune { grid-column: 1 / -1; font-size: .85rem; color: var(--matita); }
+.barra { grid-column: 1 / -1; height: 4px; background: var(--linfa); border-radius: 2px; overflow: hidden; }
+.barra span { display: block; height: 100%; background: var(--clorofilla); }
 </style>
 </head>
 
@@ -102,10 +120,10 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 <!-- ---------- HTML: la struttura ---------- -->
 <main class="pagina">
   <div>
-    <div class="occhiello">Tappa 2 · Wikipedia completa</div>
+    <div class="occhiello">Tappa 3 · Pl@ntNet</div>
     <h1>Erbario Tascabile</h1>
   </div>
-  <p class="intro">Fotografa una pianta. Finché non arriva il riconoscimento automatico, scrivi tu il nome e l'app ti porta la scheda.</p>
+  <p class="intro">Fotografa una foglia o un fiore, da vicino e a fuoco. Pl@ntNet riconosce la pianta e l'app ti porta la scheda. Puoi anche scrivere il nome a mano.</p>
 
   <div class="cornice" id="cornice">
     <div class="vuoto" id="vuoto">
@@ -138,6 +156,12 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 
   <p class="stato" id="stato" hidden></p>
 
+  <!-- NOVITÀ tappa 3: qui compaiono le ipotesi di Pl@ntNet -->
+  <section class="ipotesi" id="ipotesi" hidden>
+    <h3>Ipotesi di Pl@ntNet · tocca per cambiare</h3>
+    <div class="ipotesi" id="elenco-ipotesi"></div>
+  </section>
+
   <!-- NOVITÀ: qui compare la scheda che arriva da Wikipedia -->
   <article class="scheda" id="scheda" hidden>
     <div>
@@ -153,10 +177,17 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 <script>
 // ---------- JavaScript: il comportamento ----------
 
+// ============================================================
+//  LA TUA CHIAVE DI PL@NTNET
+//  Sostituisci il testo tra le virgolette con la tua chiave.
+//  Le virgolette devono restare: "abc123...", non abc123...
+// ============================================================
+const CHIAVE_PLANTNET = "2b10Q5N1LnGqG4slrSCYHQ9jO";
+
 const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece di document.getElementById("foto")
 let contatore = 0;
 
-// --- 1. LA FOTO (identica alla tappa 1) ---
+// --- 1. LA FOTO ---
 $("scatto").addEventListener("change", function () {
   const file = $("scatto").files[0];
   if (!file) return;
@@ -168,15 +199,113 @@ $("scatto").addEventListener("change", function () {
   $("numero").textContent = "N° " + String(contatore).padStart(3, "0");
   $("data").textContent = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
   $("testo-bottone").textContent = "Fotografa un'altra pianta";
-  // Tappa 3: qui manderemo la foto a Pl@ntNet, che chiamerà cercaSuWikipedia() da solo.
+  $("specie").textContent = "in attesa di identificazione";
+  $("det").textContent = "—";
+
+  identificaConPlantNet(file);   // NOVITÀ: la sala chiede alla cucina di lavorare
 });
 
 // --- 2. LA RICERCA PER NOME ---
 $("ricerca").addEventListener("submit", function (evento) {
   evento.preventDefault();          // impedisce alla pagina di ricaricarsi (comportamento antico dei moduli)
   const nome = $("nome").value.trim();
-  if (nome) cercaSuWikipedia(nome, "a mano");
+  if (!nome) return;
+  $("ipotesi").hidden = true;       // le ipotesi della foto non c'entrano con una ricerca a mano
+  cercaSuWikipedia(nome, "a mano");
 });
+
+// --- 2bis. IL SECONDO FORNITORE: Pl@ntNet ---
+// Stavolta non mandiamo un nome nell'indirizzo, ma una FOTO dentro un "pacco" (FormData).
+// Per questo usiamo il metodo POST ("consegno qualcosa") invece del GET di Wikipedia ("chiedo qualcosa").
+async function identificaConPlantNet(file) {
+  if (CHIAVE_PLANTNET === "2b10Q5N1LnGqG4slrSCYHQ9jO") {
+    mostraStato("Manca la chiave di Pl@ntNet: inseriscila in cima allo script, nella riga CHIAVE_PLANTNET.", true);
+    return;
+  }
+
+  $("scheda").hidden = true;
+  $("ipotesi").hidden = true;
+  mostraStato("Rimpicciolisco la foto…");
+  const fotoLeggera = await rimpicciolisci(file);
+
+  // Il "pacco": la foto più l'organo fotografato. "auto" = lascia decidere a Pl@ntNet se è foglia, fiore, frutto…
+  const pacco = new FormData();
+  pacco.append("images", fotoLeggera, "pianta.jpg");
+  pacco.append("organs", "auto");
+
+  // L'indirizzo dello sportello: "all" = tutta la flora del mondo, lang=it = nomi comuni in italiano,
+  // nb-results=3 = dammi le tre ipotesi migliori. La chiave va nell'indirizzo, come chiede la loro documentazione.
+  const indirizzo = "https://my-api.plantnet.org/v2/identify/all"
+    + "?api-key=" + encodeURIComponent(CHIAVE_PLANTNET)
+    + "&lang=it&nb-results=3";
+
+  mostraStato("Pl@ntNet sta guardando la foto…");
+  let risposta;
+  try {
+    risposta = await fetch(indirizzo, { method: "POST", body: pacco });
+  } catch (errore) {
+    // Qui si finisce se la richiesta non parte proprio: niente rete, oppure Pl@ntNet rifiuta il nostro sito.
+    mostraStato("Non riesco a contattare Pl@ntNet. Controlla la connessione. Se la connessione va, verifica su my.plantnet.org che la chiave sia «exposed» e che tra gli Authorized domains ci sia esattamente l'indirizzo del tuo sito, con https.", true);
+    return;
+  }
+
+  // Il "codice di stato" è un numero con cui ogni sportello dice com'è andata. 200 = tutto bene.
+  if (risposta.status === 404) { mostraStato("Pl@ntNet non ha riconosciuto nessuna pianta. Riprova più vicino, con una foglia o un fiore ben a fuoco.", true); return; }
+  if (risposta.status === 401 || risposta.status === 403) { mostraStato("Pl@ntNet non accetta la chiave. Controlla di averla copiata tutta, senza spazi, dentro le virgolette.", true); return; }
+  if (risposta.status === 429) { mostraStato("Hai finito le identificazioni gratuite di oggi. Domani si ricomincia.", true); return; }
+  if (!risposta.ok) { mostraStato("Pl@ntNet ha risposto con un errore (" + risposta.status + "). Riprova tra poco.", true); return; }
+
+  const dati = await risposta.json();
+  // dati.results è una lista di ipotesi, dalla più probabile alla meno probabile.
+  // Ognuna ha: score (da 0 a 1) e species (nome scientifico, nomi comuni, famiglia).
+  mostraIpotesi(dati.results);
+  scegliIpotesi(dati.results[0], 0);   // la prima ipotesi va subito su Wikipedia
+}
+
+function mostraIpotesi(risultati) {
+  const elenco = $("elenco-ipotesi");
+  elenco.replaceChildren();
+  risultati.forEach(function (ipotesi, posizione) {
+    const percentuale = Math.round(ipotesi.score * 100);
+    const bottone = document.createElement("button");
+    bottone.type = "button";
+    bottone.className = "candidato";
+    bottone.innerHTML = '<span class="latino"></span><span class="punteggio"></span><span class="comune"></span><span class="barra"><span></span></span>';
+    bottone.querySelector(".latino").textContent = ipotesi.species.scientificNameWithoutAuthor;
+    bottone.querySelector(".punteggio").textContent = percentuale + "%";
+    bottone.querySelector(".comune").textContent =
+      (ipotesi.species.commonNames[0] || "nome comune non disponibile") + " · " + ipotesi.species.family.scientificNameWithoutAuthor;
+    bottone.querySelector(".barra span").style.width = percentuale + "%";
+    bottone.addEventListener("click", function () { scegliIpotesi(ipotesi, posizione); });
+    elenco.append(bottone);
+  });
+  $("ipotesi").hidden = false;
+}
+
+function scegliIpotesi(ipotesi, posizione) {
+  document.querySelectorAll(".candidato").forEach(function (b, i) { b.classList.toggle("scelto", i === posizione); });
+  const percentuale = Math.round(ipotesi.score * 100);
+  // Cerchiamo su Wikipedia col nome scientifico: è unico al mondo, i nomi comuni no.
+  cercaSuWikipedia(ipotesi.species.scientificNameWithoutAuthor, "Pl@ntNet, " + percentuale + "%");
+}
+
+// Le foto del telefono pesano diversi megabyte. Le ridisegniamo più piccole (lato lungo 1280 pixel)
+// su una "tela" (canvas) invisibile: si spedisce prima e a Pl@ntNet basta e avanza.
+function rimpicciolisci(file) {
+  return new Promise(function (fatto) {
+    const img = new Image();
+    img.onload = function () {
+      const scala = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const tela = document.createElement("canvas");
+      tela.width = Math.round(img.width * scala);
+      tela.height = Math.round(img.height * scala);
+      tela.getContext("2d").drawImage(img, 0, 0, tela.width, tela.height);
+      tela.toBlob(function (blob) { fatto(blob || file); }, "image/jpeg", 0.85);
+    };
+    img.onerror = function () { fatto(file); };   // se qualcosa va storto, mandiamo l'originale
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 // --- 3. IL FORNITORE: Wikipedia (versione 2: la voce completa) ---
 // "async" vuol dire che la funzione deve ASPETTARE una risposta da internet.
