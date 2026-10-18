@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Erbario Tascabile</title>
-  <link rel="manifest" href="manifest.json">
-   <link rel="apple-touch-icon" href="icona-180.png">
-   <meta name="theme-color" content="#2f6b3f">
-   <meta name="apple-mobile-web-app-capable" content="yes">
-   <meta name="apple-mobile-web-app-title" content="Erbario">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icona-180.png">
+<meta name="theme-color" content="#2f6b3f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Erbario">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <!--
@@ -125,6 +125,24 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .scheda details { border-top: 1px solid var(--bordo); padding-block: .6rem; }
 .scheda summary { cursor: pointer; font-weight: 700; }
 .scheda details p { margin-top: .5rem; }
+
+/* NOVITÀ tappa 4: l'erbario */
+.erbario { border-top: 1.5px solid var(--inchiostro); padding-top: 1rem; display: flex; flex-direction: column; gap: .75rem; }
+.erbario-testata { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.erbario h2 { font-family: var(--f-titolo); font-weight: 400; font-size: 1.5rem; margin: 0; }
+.elenco-erbario { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.voce { display: flex; align-items: stretch; border: 1.5px solid var(--bordo); border-radius: 6px; overflow: hidden; }
+.voce .apri {
+  flex: 1; min-width: 0; display: flex; gap: .8rem; align-items: center; text-align: left;
+  background: var(--carta); color: var(--inchiostro); border: 0; padding: .5rem; font: inherit; cursor: pointer;
+}
+.voce img { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: 4px; flex: none; background: var(--linfa); }
+.voce .testi { display: flex; flex-direction: column; min-width: 0; }
+.voce .latino { font-family: var(--f-titolo); font-style: italic; overflow-wrap: anywhere; }
+.voce .comune { font-size: .85rem; color: var(--matita); }
+.voce .quando { font-family: var(--f-etichetta); font-size: .7rem; color: var(--matita); font-variant-numeric: tabular-nums; }
+.voce .elimina { background: var(--carta); color: var(--matita); border: 0; border-left: 1px solid var(--bordo); padding: 0 .9rem; font-size: 1.3rem; cursor: pointer; }
+.voce .apri:focus-visible, .voce .elimina:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: -3px; }
 </style>
 </head>
 
@@ -132,7 +150,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 <!-- ---------- HTML: la struttura ---------- -->
 <main class="pagina">
   <div>
-    <div class="occhiello">Tappa 3 · Pl@ntNet</div>
+    <div class="occhiello">Tappa 4 · l'erbario</div>
     <h1>Erbario Tascabile</h1>
   </div>
   <p class="intro">Fotografa una foglia o un fiore, da vicino e a fuoco. Pl@ntNet riconosce la pianta e l'app ti porta la scheda. Puoi anche scrivere il nome a mano.</p>
@@ -186,6 +204,16 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <div id="scheda-testo"></div>
     <a id="scheda-link" target="_blank" rel="noopener">Leggi la voce completa su Wikipedia</a>
   </article>
+
+  <!-- NOVITÀ tappa 4: l'erbario, cioè lo storico delle piante trovate -->
+  <section class="erbario" aria-labelledby="titolo-erbario">
+    <div class="erbario-testata">
+      <h2 id="titolo-erbario">Il mio erbario</h2>
+      <span class="occhiello" id="conta-erbario">0 esemplari</span>
+    </div>
+    <p class="stato" id="erbario-vuoto">Qui compariranno le piante che fotografi. Restano salvate su questo telefono.</p>
+    <ul class="elenco-erbario" id="elenco-erbario"></ul>
+  </section>
 </main>
 
 <script>
@@ -200,26 +228,41 @@ const CHIAVE_PLANTNET = "2b10Q5N1LnGqG4slrSCYHQ9jO";
 
 const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece di document.getElementById("foto")
 let contatore = 0;
-let nomeComune = "";   // NOVITÀ: il nome comune che ci dà Pl@ntNet, da mostrare nella scheda
+let nomeComune = "";          // il nome comune che ci dà Pl@ntNet, da mostrare nella scheda
+let esemplareCorrente = null; // NOVITÀ: la pianta appena fotografata, da salvare nell'erbario
 
 // --- 1. LA FOTO ---
-$("scatto").addEventListener("change", function () {
+$("scatto").addEventListener("change", async function () {
   const file = $("scatto").files[0];
   if (!file) return;
   $("foto").src = URL.createObjectURL(file);
   $("foto").hidden = false;
   $("vuoto").hidden = true;
   $("cornice").classList.add("piena");
-  contatore = contatore + 1;
-  $("numero").textContent = "N° " + String(contatore).padStart(3, "0");
-  $("data").textContent = new Date().toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
   $("testo-bottone").textContent = "Fotografa un'altra pianta";
-  $("specie").textContent = "in attesa di identificazione";
-  $("comune").textContent = "—";
-  $("det").textContent = "—";
 
-  identificaConPlantNet(file);   // NOVITÀ: la sala chiede alla cucina di lavorare
+  // NOVITÀ: prepariamo la "scheda d'archivio" di questo esemplare.
+  // Un oggetto è un contenitore di dati con le loro etichette, proprio come il JSON.
+  esemplareCorrente = {
+    id: Date.now(),                        // un numero unico: i millisecondi trascorsi dal 1970
+    numero: prossimoNumero(),              // N° progressivo nel tuo erbario
+    data: new Date().toISOString(),        // data e ora, in un formato standard
+    foto: await miniatura(file),           // la foto, ridotta a francobollo
+    specie: "", comune: "", det: ""        // li riempiremo quando risponde Pl@ntNet
+  };
+  compilaCartellino(esemplareCorrente);
+  $("specie").textContent = "in attesa di identificazione";
+
+  identificaConPlantNet(file);   // la sala chiede alla cucina di lavorare
 });
+
+function compilaCartellino(e) {
+  $("numero").textContent = "N° " + String(e.numero).padStart(3, "0");
+  $("data").textContent = new Date(e.data).toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  $("specie").textContent = e.specie || "—";
+  $("comune").textContent = e.comune || "—";
+  $("det").textContent = e.det || "—";
+}
 
 // --- 2. LA RICERCA PER NOME ---
 $("ricerca").addEventListener("submit", function (evento) {
@@ -227,6 +270,7 @@ $("ricerca").addEventListener("submit", function (evento) {
   const nome = $("nome").value.trim();
   if (!nome) return;
   $("ipotesi").hidden = true;       // le ipotesi della foto non c'entrano con una ricerca a mano
+  esemplareCorrente = null;         // una ricerca a mano non finisce nell'erbario (non c'è foto)
   nomeComune = "";                  // a mano non abbiamo il nome comune di Pl@ntNet
   $("comune").textContent = "—";
   cercaSuWikipedia(nome, "a mano");
@@ -306,9 +350,128 @@ function scegliIpotesi(ipotesi, posizione) {
   // NOVITÀ: i nomi comuni arrivano da Pl@ntNet in una lista; ne teniamo al massimo tre.
   nomeComune = ipotesi.species.commonNames.slice(0, 3).join(", ");
   $("comune").textContent = nomeComune || "non disponibile";
+  const det = "Pl@ntNet, " + percentuale + "%";
+
+  // NOVITÀ: salviamo nell'erbario. Se poi tocchi un'altra ipotesi, la stessa scheda viene aggiornata.
+  if (esemplareCorrente) {
+    esemplareCorrente.specie = ipotesi.species.scientificNameWithoutAuthor;
+    esemplareCorrente.comune = nomeComune;
+    esemplareCorrente.det = det;
+    salvaEsemplare(esemplareCorrente);
+  }
+
   // Cerchiamo su Wikipedia col nome scientifico: è unico al mondo, i nomi comuni no.
-  cercaSuWikipedia(ipotesi.species.scientificNameWithoutAuthor, "Pl@ntNet, " + percentuale + "%");
+  cercaSuWikipedia(ipotesi.species.scientificNameWithoutAuthor, det);
 }
+
+// ============================================================
+//  NOVITÀ TAPPA 4: L'ERBARIO (la memoria dell'app)
+// ============================================================
+// localStorage è un piccolo "cassetto" che il browser riserva a ogni sito, sul tuo telefono.
+// Ci si possono mettere solo testi, con un nome (una "chiave"). Il nostro cassetto si chiama "erbario".
+// Per metterci una lista di esemplari, la trasformiamo in testo JSON (JSON.stringify)
+// e quando la rileggiamo la ritrasformiamo in lista (JSON.parse).
+// Il cassetto ha una capienza di circa 5 MB: per questo salviamo foto piccole.
+
+function leggiErbario() {
+  try {
+    return JSON.parse(localStorage.getItem("erbario")) || [];   // se il cassetto è vuoto: lista vuota
+  } catch (errore) {
+    return [];
+  }
+}
+
+function scriviErbario(lista) {
+  try {
+    localStorage.setItem("erbario", JSON.stringify(lista));
+    return true;
+  } catch (errore) {
+    mostraStato("Non riesco a salvare nell'erbario: probabilmente la memoria è piena. Elimina qualche esemplare vecchio.", true);
+    return false;
+  }
+}
+
+function prossimoNumero() {
+  const lista = leggiErbario();
+  return lista.length === 0 ? 1 : Math.max(...lista.map((e) => e.numero)) + 1;
+}
+
+function salvaEsemplare(esemplare) {
+  const lista = leggiErbario();
+  const posizione = lista.findIndex((e) => e.id === esemplare.id);
+  if (posizione >= 0) lista[posizione] = esemplare;   // c'era già: lo aggiorniamo
+  else lista.unshift(esemplare);                      // è nuovo: lo mettiamo in cima
+  scriviErbario(lista);
+  compilaCartellino(esemplare);
+  mostraErbario();
+}
+
+function eliminaEsemplare(id) {
+  if (!confirm("Eliminare questo esemplare dall'erbario?")) return;
+  scriviErbario(leggiErbario().filter((e) => e.id !== id));
+  mostraErbario();
+}
+
+// Disegna l'elenco dell'erbario in fondo alla pagina.
+function mostraErbario() {
+  const lista = leggiErbario();
+  const elenco = $("elenco-erbario");
+  elenco.replaceChildren();
+  $("conta-erbario").textContent = lista.length === 1 ? "1 esemplare" : lista.length + " esemplari";
+  $("erbario-vuoto").hidden = lista.length > 0;
+
+  for (const e of lista) {
+    const riga = document.createElement("li");
+    riga.className = "voce";
+    riga.innerHTML =
+      '<button type="button" class="apri"><img alt=""><span class="testi">' +
+      '<span class="latino"></span><span class="comune"></span><span class="quando"></span></span></button>' +
+      '<button type="button" class="elimina" aria-label="Elimina">×</button>';
+    riga.querySelector("img").src = e.foto;
+    riga.querySelector(".latino").textContent = e.specie || "non identificata";
+    riga.querySelector(".comune").textContent = e.comune || "";
+    riga.querySelector(".quando").textContent = "N° " + String(e.numero).padStart(3, "0") + " · " +
+      new Date(e.data).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
+    riga.querySelector(".apri").addEventListener("click", function () { apriEsemplare(e); });
+    riga.querySelector(".elimina").addEventListener("click", function () { eliminaEsemplare(e.id); });
+    elenco.append(riga);
+  }
+}
+
+// Riapre un esemplare salvato: foto, cartellino e scheda di Wikipedia.
+function apriEsemplare(e) {
+  esemplareCorrente = null;     // stiamo solo guardando, non stiamo fotografando
+  $("foto").src = e.foto;
+  $("foto").hidden = false;
+  $("vuoto").hidden = true;
+  $("cornice").classList.add("piena");
+  $("ipotesi").hidden = true;
+  compilaCartellino(e);
+  nomeComune = e.comune;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (e.specie) cercaSuWikipedia(e.specie, e.det);
+}
+
+// Il "francobollo": la foto ridotta a 240 pixel, trasformata in testo (data URL)
+// perché il cassetto accetta solo testi. Pesa circa 15-20 KB.
+function miniatura(file) {
+  return new Promise(function (fatto) {
+    const img = new Image();
+    img.onload = function () {
+      const lato = 240;
+      const tela = document.createElement("canvas");
+      tela.width = lato; tela.height = lato;
+      // ritagliamo un quadrato al centro della foto
+      const q = Math.min(img.width, img.height);
+      tela.getContext("2d").drawImage(img, (img.width - q) / 2, (img.height - q) / 2, q, q, 0, 0, lato, lato);
+      fatto(tela.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = function () { fatto(""); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+mostraErbario();   // all'apertura dell'app, mostriamo subito l'erbario salvato
 
 // Le foto del telefono pesano diversi megabyte. Le ridisegniamo più piccole (lato lungo 1280 pixel)
 // su una "tela" (canvas) invisibile: si spedisce prima e a Pl@ntNet basta e avanza.
