@@ -26,6 +26,15 @@
      (Luoghi per ora è un segnaposto: lo riempiremo in una prossima tappa)
    - uno sfondo di foglie disegnate a linee, fatto in SVG
   La parte che fa le cose (foto, Pl@ntNet, Wikipedia, erbario) è la stessa della tappa 4.
+
+  ERBARIO TASCABILE · Tappe 6 e 8: targhette, aggiunta a mano, nuove fonti
+  Novità:
+   - tappa 6: otto targhette (Commestibile, Tossica…) che scegli tu toccandole,
+     visibili anche nell'elenco dell'erbario
+   - tappa 6: "Aggiungi al mio erbario" per le piante cercate a mano, senza foto
+     (nell'erbario compaiono con l'icona della foglia)
+   - tappa 8: i dati arrivano da GBIF (famiglia, nomi italiani, dove è segnalata),
+     con un link per approfondire su Acta Plantarum. Wikipedia resta come riserva.
 -->
 
 <style>
@@ -144,6 +153,7 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .scheda .nome-comune { font-size: 1.05rem; margin-top: .2rem; }
 .in-traduzione { opacity: .5; }
 .scheda details { border-top: 1px solid var(--bordo); padding-block: .6rem; }
+.scheda details details:last-child { padding-bottom: 0; }
 .scheda summary { cursor: pointer; font-weight: 700; }
 .scheda details p { margin-top: .5rem; }
 
@@ -161,6 +171,36 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .voce .quando { font-family: var(--f-etichetta); font-size: .7rem; color: var(--matita); font-variant-numeric: tabular-nums; }
 .voce .elimina { background: transparent; color: var(--matita); border: 0; border-left: 1px solid var(--bordo); padding: 0 .9rem; font-size: 1.3rem; cursor: pointer; }
 .voce .apri:focus-visible, .voce .elimina:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: -3px; }
+
+/* NOVITÀ tappa 6: le targhette */
+.blocco { display: flex; flex-direction: column; gap: .5rem; }
+.etichetta-blocco { font-family: var(--f-etichetta); font-weight: 500; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase; color: var(--matita); margin: 0; }
+.targhette { display: flex; flex-wrap: wrap; gap: .4rem; }   /* flex-wrap: se non ci stanno, vanno a capo */
+.targhetta {
+  font: 600 .82rem var(--f-testo); padding: .35rem .75rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--bordo); background: transparent; color: var(--matita);
+}
+/* Scelta = verde; "Tossica" scelta = rossa, per farsi notare */
+.targhetta[aria-pressed="true"], .voce .targhetta { background: #142a1b; border-color: #2c5236; color: var(--clorofilla); }
+.targhetta.tossica[aria-pressed="true"], .voce .targhetta.tossica { background: #2e1310; border-color: #6b2a22; color: var(--errore); }
+.targhetta:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: 2px; }
+.voce .targhette { margin-top: .3rem; gap: .3rem; }
+.voce .targhetta { font-size: .7rem; padding: .1rem .5rem; cursor: inherit; }
+.nota { font-size: .82rem; color: var(--matita); margin: 0; }
+/* La fogliolina al posto della foto */
+.senza-foto { width: 3.5rem; height: 3.5rem; flex: none; display: grid; place-items: center; border: 1px dashed var(--bordo); border-radius: 6px; }
+.senza-foto svg { width: 1.6rem; height: 1.6rem; stroke: var(--clorofilla); fill: none; stroke-width: 2.5; }
+
+/* NOVITÀ tappa 8: il riquadro dei dati di GBIF */
+.dati { border: 1px solid var(--bordo); border-radius: 8px; padding: .75rem .9rem; display: flex; flex-direction: column; gap: .5rem; }
+.dati dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: .3rem 1rem; font-size: .92rem; }
+.dati dt { color: var(--matita); }
+.dati dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.dati a, .approfondisci { color: var(--clorofilla); font-weight: 700; }
+#wiki > summary { color: var(--matita); }
+#wiki[open] > summary { margin-bottom: .6rem; }
+#wiki .sottotitolo { margin-bottom: .6rem; }
+#wiki img { margin-bottom: .6rem; }
 
 /* La pagina Luoghi, per ora un segnaposto */
 .segnaposto { background: var(--superficie); border: 1.5px dashed var(--bordo); border-radius: 8px; padding: 1.25rem; color: var(--matita); }
@@ -293,11 +333,38 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <div>
       <div class="sottotitolo" id="scheda-sottotitolo"></div>
       <h2 id="scheda-titolo"></h2>
-      <div class="nome-comune" id="scheda-comune" hidden></div>
     </div>
-    <img id="scheda-immagine" alt="" hidden>
-    <div id="scheda-testo"></div>
-    <a id="scheda-link" target="_blank" rel="noopener">Leggi la voce completa su Wikipedia</a>
+
+    <!-- NOVITÀ tappa 6: le targhette. I pulsanti li crea il JavaScript (disegnaTarghette). -->
+    <div class="blocco">
+      <h3 class="etichetta-blocco">Targhette · tocca per sceglierle</h3>
+      <div class="targhette" id="elenco-targhette"></div>
+      <p class="nota">Le targhette le scegli tu. «Commestibile» non è una conferma: l'app può sbagliare pianta, quindi non mangiare nulla solo perché lo dice l'app.</p>
+    </div>
+
+    <!-- NOVITÀ tappa 8: i dati di GBIF e il link ad Acta Plantarum -->
+    <section class="dati" id="dati-gbif" hidden>
+      <h3 class="etichetta-blocco">Dati da GBIF</h3>
+      <dl id="gbif-dati"></dl>
+      <a id="link-gbif" target="_blank" rel="noopener">Scheda completa su GBIF ↗</a>
+    </section>
+    <a class="approfondisci" id="link-acta" target="_blank" rel="noopener">Approfondisci su Acta Plantarum ↗</a>
+
+    <!-- NOVITÀ tappa 6: aggiungere all'erbario una pianta cercata a mano -->
+    <div class="blocco" id="blocco-aggiungi">
+      <button class="bottone" type="button" id="aggiungi">+ Aggiungi al mio erbario</button>
+      <p class="nota">Senza foto: nell'erbario comparirà con l'icona della foglia.</p>
+    </div>
+    <p class="nota" id="gia-nell-erbario" hidden>✓ È nel tuo erbario. Le targhette si salvano da sole.</p>
+
+    <!-- NOVITÀ tappa 8: Wikipedia diventa la riserva, chiusa dentro un <details> -->
+    <details id="wiki">
+      <summary>Descrizione da Wikipedia (riserva)</summary>
+      <div class="sottotitolo" id="wiki-fonte"></div>
+      <img id="scheda-immagine" alt="" hidden>
+      <div id="wiki-testo"></div>
+      <a id="scheda-link" target="_blank" rel="noopener" hidden>Leggi la voce completa su Wikipedia</a>
+    </details>
   </article>
 </main>
 
@@ -350,12 +417,17 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 //  Sostituisci il testo tra le virgolette con la tua chiave.
 //  Le virgolette devono restare: "abc123...", non abc123...
 // ============================================================
-const CHIAVE_PLANTNET = "2b10Q5N1LnGqG4slrSCYHQ9jO";
+const CHIAVE_PLANTNET = "INSERISCI-QUI-LA-TUA-CHIAVE";
 
 const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece di document.getElementById("foto")
-let contatore = 0;
-let nomeComune = "";          // il nome comune che ci dà Pl@ntNet, da mostrare nella scheda
-let esemplareCorrente = null; // NOVITÀ: la pianta appena fotografata, da salvare nell'erbario
+// La pianta mostrata in Riconosci: fotografata, cercata a mano o riaperta dall'erbario.
+// NOVITÀ tappa 6: c'è sempre, anche nella ricerca a mano (lì è una "bozza" finché non premi Aggiungi).
+let esemplareCorrente = null;
+let ricercaAttuale = 0;       // NOVITÀ: un contatore delle ricerche, per scartare le risposte vecchie (vedi cercaPianta)
+
+// NOVITÀ TAPPA 6: le targhette che puoi dare a una pianta. Le scegli tu, a mano.
+const TARGHETTE = ["Commestibile", "Da frutto", "Aromatica", "Officinale", "Tossica", "Spontanea", "Ornamentale", "Da appartamento"];
+const ICONA_FOGLIA = '<svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 58V26"/><path d="M32 40c-10 0-16-6-17-16 10 0 16 6 17 16z"/><path d="M32 30c0-10 6-17 17-18 0 11-6 17-17 18z"/></svg>';
 
 // ============================================================
 //  NOVITÀ TAPPA 5: LE TRE PAGINE
@@ -384,20 +456,18 @@ mostraPagina();   // e una volta subito, all'apertura dell'app
 $("scatto").addEventListener("change", async function () {
   const file = $("scatto").files[0];
   if (!file) return;
-  $("foto").src = URL.createObjectURL(file);
-  $("foto").hidden = false;
-  $("vuoto").hidden = true;
-  $("cornice").classList.add("piena");
+  mostraFoto(URL.createObjectURL(file));
   $("testo-bottone").textContent = "Fotografa un'altra pianta";
 
-  // NOVITÀ: prepariamo la "scheda d'archivio" di questo esemplare.
+  // Prepariamo la "scheda d'archivio" di questo esemplare.
   // Un oggetto è un contenitore di dati con le loro etichette, proprio come il JSON.
   esemplareCorrente = {
     id: Date.now(),                        // un numero unico: i millisecondi trascorsi dal 1970
     numero: prossimoNumero(),              // N° progressivo nel tuo erbario
     data: new Date().toISOString(),        // data e ora, in un formato standard
     foto: await miniatura(file),           // la foto, ridotta a francobollo
-    specie: "", comune: "", det: ""        // li riempiremo quando risponde Pl@ntNet
+    specie: "", comune: "", det: "",       // li riempiremo quando risponde Pl@ntNet
+    targhette: []                          // NOVITÀ tappa 6: all'inizio nessuna targhetta
   };
   compilaCartellino(esemplareCorrente);
   $("specie").textContent = "in attesa di identificazione";
@@ -405,9 +475,20 @@ $("scatto").addEventListener("change", async function () {
   identificaConPlantNet(file);   // la sala chiede alla cucina di lavorare
 });
 
+// Mette una foto nella cornice; senza foto ("") rimette la cornice vuota con la fogliolina.
+function mostraFoto(indirizzo) {
+  $("foto").src = indirizzo || "";
+  $("foto").hidden = !indirizzo;
+  $("vuoto").hidden = !!indirizzo;   // !! trasforma un testo in vero/falso: "" → falso, "abc" → vero
+  $("cornice").classList.toggle("piena", !!indirizzo);
+}
+
 function compilaCartellino(e) {
-  $("numero").textContent = "N° " + String(e.numero).padStart(3, "0");
-  $("data").textContent = new Date(e.data).toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  // NOVITÀ: una bozza della ricerca a mano non ha ancora numero né data, quindi mostriamo "—"
+  $("numero").textContent = e.numero ? "N° " + String(e.numero).padStart(3, "0") : "N° —";
+  $("data").textContent = e.data
+    ? new Date(e.data).toLocaleString("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—";
   $("specie").textContent = e.specie || "—";
   $("comune").textContent = e.comune || "—";
   $("det").textContent = e.det || "—";
@@ -419,10 +500,12 @@ $("ricerca").addEventListener("submit", function (evento) {
   const nome = $("nome").value.trim();
   if (!nome) return;
   $("ipotesi").hidden = true;       // le ipotesi della foto non c'entrano con una ricerca a mano
-  esemplareCorrente = null;         // una ricerca a mano non finisce nell'erbario (non c'è foto)
-  nomeComune = "";                  // a mano non abbiamo il nome comune di Pl@ntNet
-  $("comune").textContent = "—";
-  cercaSuWikipedia(nome, "a mano");
+  // NOVITÀ tappa 6: anche la ricerca a mano prepara un esemplare, ma è una BOZZA:
+  // niente numero, niente data, niente foto. Entra nell'erbario solo se premi "Aggiungi al mio erbario".
+  esemplareCorrente = { id: Date.now(), numero: null, data: null, foto: "", specie: "", comune: "", det: "a mano", targhette: [] };
+  mostraFoto("");
+  compilaCartellino(esemplareCorrente);
+  cercaPianta(nome, true);          // true = "l'hai scritto tu a mano" (vedi cercaPianta)
 });
 
 // --- 2bis. IL SECONDO FORNITORE: Pl@ntNet ---
@@ -496,21 +579,16 @@ function mostraIpotesi(risultati) {
 function scegliIpotesi(ipotesi, posizione) {
   document.querySelectorAll(".candidato").forEach(function (b, i) { b.classList.toggle("scelto", i === posizione); });
   const percentuale = Math.round(ipotesi.score * 100);
-  // NOVITÀ: i nomi comuni arrivano da Pl@ntNet in una lista; ne teniamo al massimo tre.
-  nomeComune = ipotesi.species.commonNames.slice(0, 3).join(", ");
-  $("comune").textContent = nomeComune || "non disponibile";
-  const det = "Pl@ntNet, " + percentuale + "%";
 
-  // NOVITÀ: salviamo nell'erbario. Se poi tocchi un'altra ipotesi, la stessa scheda viene aggiornata.
-  if (esemplareCorrente) {
-    esemplareCorrente.specie = ipotesi.species.scientificNameWithoutAuthor;
-    esemplareCorrente.comune = nomeComune;
-    esemplareCorrente.det = det;
-    salvaEsemplare(esemplareCorrente);
-  }
+  // Salviamo nell'erbario. Se poi tocchi un'altra ipotesi, la stessa scheda viene aggiornata.
+  // I nomi comuni arrivano da Pl@ntNet in una lista; ne teniamo al massimo tre.
+  esemplareCorrente.specie = ipotesi.species.scientificNameWithoutAuthor;
+  esemplareCorrente.comune = ipotesi.species.commonNames.slice(0, 3).join(", ");
+  esemplareCorrente.det = "Pl@ntNet, " + percentuale + "%";
+  salvaEsemplare(esemplareCorrente);
 
-  // Cerchiamo su Wikipedia col nome scientifico: è unico al mondo, i nomi comuni no.
-  cercaSuWikipedia(ipotesi.species.scientificNameWithoutAuthor, det);
+  // NOVITÀ tappa 8: chiediamo i dati a GBIF (e non più subito a Wikipedia), sempre col nome scientifico.
+  cercaPianta(ipotesi.species.scientificNameWithoutAuthor, false);
 }
 
 // ============================================================
@@ -555,10 +633,17 @@ function salvaEsemplare(esemplare) {
   mostraErbario();
 }
 
+// NOVITÀ: risponde "sì" se questo esemplare è già nel cassetto dell'erbario.
+// .some() scorre la lista e si ferma appena trova un elemento che va bene.
+function nelErbario(id) {
+  return leggiErbario().some((e) => e.id === id);
+}
+
 function eliminaEsemplare(id) {
   if (!confirm("Eliminare questo esemplare dall'erbario?")) return;
   scriviErbario(leggiErbario().filter((e) => e.id !== id));
   mostraErbario();
+  if (esemplareCorrente) aggiornaAggiungi();   // se era la pianta aperta in Riconosci, ricompare "Aggiungi"
 }
 
 // Disegna l'elenco dell'erbario nella sua pagina.
@@ -572,34 +657,85 @@ function mostraErbario() {
   for (const e of lista) {
     const riga = document.createElement("li");
     riga.className = "voce";
+    // NOVITÀ tappa 6: se c'è la foto mettiamo la foto, altrimenti l'icona della foglia.
+    // NOVITÀ tappa 6: sotto il nome, un posto (.targhette) per le targhette scelte.
+    const figura = e.foto ? '<img alt="">' : '<span class="senza-foto">' + ICONA_FOGLIA + '</span>';
     riga.innerHTML =
-      '<button type="button" class="apri"><img alt=""><span class="testi">' +
-      '<span class="latino"></span><span class="comune"></span><span class="quando"></span></span></button>' +
+      '<button type="button" class="apri">' + figura + '<span class="testi">' +
+      '<span class="latino"></span><span class="comune"></span><span class="quando"></span>' +
+      '<span class="targhette"></span></span></button>' +
       '<button type="button" class="elimina" aria-label="Elimina">×</button>';
-    riga.querySelector("img").src = e.foto;
+    if (e.foto) riga.querySelector("img").src = e.foto;
     riga.querySelector(".latino").textContent = e.specie || "non identificata";
     riga.querySelector(".comune").textContent = e.comune || "";
     riga.querySelector(".quando").textContent = "N° " + String(e.numero).padStart(3, "0") + " · " +
       new Date(e.data).toLocaleDateString("it-IT", { day: "numeric", month: "short", year: "numeric" });
+    // Gli esemplari salvati prima della tappa 6 non hanno "targhette": (e.targhette || []) evita l'errore.
+    for (const t of (e.targhette || [])) {
+      const targhetta = document.createElement("span");
+      targhetta.className = "targhetta" + (t === "Tossica" ? " tossica" : "");
+      targhetta.textContent = t;
+      riga.querySelector(".targhette").append(targhetta);
+    }
     riga.querySelector(".apri").addEventListener("click", function () { apriEsemplare(e); });
     riga.querySelector(".elimina").addEventListener("click", function () { eliminaEsemplare(e.id); });
     elenco.append(riga);
   }
 }
 
-// Riapre un esemplare salvato: foto, cartellino e scheda di Wikipedia.
+// Riapre un esemplare salvato nella pagina Riconosci: foto, cartellino, targhette e scheda.
 function apriEsemplare(e) {
-  esemplareCorrente = null;     // stiamo solo guardando, non stiamo fotografando
-  $("foto").src = e.foto;
-  $("foto").hidden = false;
-  $("vuoto").hidden = true;
-  $("cornice").classList.add("piena");
+  // NOVITÀ: l'esemplare riaperto diventa quello "corrente", così puoi cambiargli le targhette.
+  esemplareCorrente = e;
+  if (!e.targhette) e.targhette = [];
+  mostraFoto(e.foto);
   $("ipotesi").hidden = true;
   compilaCartellino(e);
-  nomeComune = e.comune;
-  location.hash = "#riconosci";   // NOVITÀ: l'esemplare si guarda nella pagina Riconosci, quindi ci spostiamo lì
-  if (e.specie) cercaSuWikipedia(e.specie, e.det);
+  location.hash = "#riconosci";   // l'esemplare si guarda nella pagina Riconosci, quindi ci spostiamo lì
+  if (e.specie) cercaPianta(e.specie, false);
 }
+
+// ============================================================
+//  NOVITÀ TAPPA 6: LE TARGHETTE E "AGGIUNGI AL MIO ERBARIO"
+// ============================================================
+// Disegna le otto targhette come pulsanti. aria-pressed="true" vuol dire "premuto, scelto":
+// il CSS colora quelle scelte, e i lettori di schermo dicono "selezionato".
+function disegnaTarghette() {
+  const e = esemplareCorrente;
+  const contenitore = $("elenco-targhette");
+  contenitore.replaceChildren();
+  for (const t of TARGHETTE) {
+    const bottone = document.createElement("button");
+    bottone.type = "button";
+    bottone.className = "targhetta" + (t === "Tossica" ? " tossica" : "");
+    bottone.textContent = t;
+    bottone.setAttribute("aria-pressed", e.targhette.includes(t) ? "true" : "false");
+    bottone.addEventListener("click", function () {
+      // Tocco = "se c'era la tolgo, se non c'era la metto".
+      const scelte = e.targhette.includes(t) ? e.targhette.filter((x) => x !== t) : [...e.targhette, t];
+      // Le rimettiamo nell'ordine della lista TARGHETTE, così sono sempre in fila allo stesso modo.
+      e.targhette = TARGHETTE.filter((x) => scelte.includes(x));
+      if (nelErbario(e.id)) salvaEsemplare(e);   // già nell'erbario: salviamo subito
+      disegnaTarghette();                        // ridisegniamo, così il colore cambia
+    });
+    contenitore.append(bottone);
+  }
+}
+
+// Mostra "Aggiungi al mio erbario" solo se la pianta non c'è ancora; altrimenti la scritta "È nel tuo erbario".
+function aggiornaAggiungi() {
+  const dentro = nelErbario(esemplareCorrente.id);
+  $("blocco-aggiungi").hidden = dentro;
+  $("gia-nell-erbario").hidden = !dentro;
+}
+
+$("aggiungi").addEventListener("click", function () {
+  const e = esemplareCorrente;
+  e.numero = prossimoNumero();          // ora che entra nell'erbario, prende numero e data
+  e.data = new Date().toISOString();
+  salvaEsemplare(e);                    // salva, aggiorna il cartellino e l'elenco
+  aggiornaAggiungi();
+});
 
 // Il "francobollo": la foto ridotta a 240 pixel, trasformata in testo (data URL)
 // perché il cassetto accetta solo testi. Pesa circa 15-20 KB.
@@ -640,16 +776,189 @@ function rimpicciolisci(file) {
   });
 }
 
-// --- 3. IL FORNITORE: Wikipedia (versione 2: la voce completa) ---
+// ============================================================
+//  NOVITÀ TAPPA 8: LE FONTI. GBIF per i dati, Acta Plantarum per approfondire,
+//  Wikipedia solo come riserva.
+// ============================================================
+// GBIF (Global Biodiversity Information Facility) è la banca dati mondiale della biodiversità.
+// È gratuita e non vuole chiavi. Le sue "porte" (gli indirizzi dell'API) iniziano tutte così:
+const GBIF = "https://api.gbif.org/v1";
+// I gradi della classificazione che contano come "una pianta precisa" (specie, sottospecie, varietà, forma).
+// Se GBIF trova solo il genere (es. "Salvia") o la famiglia, per noi non basta.
+const GRADI_SPECIE = ["SPECIES", "SUBSPECIES", "VARIETY", "FORM"];
+// Intl.DisplayNames è un traduttore già dentro il browser: "FR" → "Francia", "IT" → "Italia".
+const nomiPaesi = new Intl.DisplayNames(["it"], { type: "region" });
+
+// Chiede a GBIF tutto quello che ci serve su una pianta. Restituisce un oggetto con i dati, oppure null se non la trova.
+async function chiediAGBIF(nome) {
+  // 1) "match": GBIF prova ad abbinare il nome a una pianta della sua banca dati.
+  //    kingdom=Plantae gli dice di cercare solo tra le piante (esistono anche animali con nomi simili!).
+  const risposta = await fetch(GBIF + "/species/match?kingdom=Plantae&name=" + encodeURIComponent(nome));
+  const abbinamento = await risposta.json();
+  // matchType dice come è andato l'abbinamento: EXACT = esatto, FUZZY = "quasi" (magari un errore di battitura),
+  // HIGHERRANK = ha trovato solo il genere o la famiglia, NONE = niente.
+  // confidence (da 0 a 100) dice quanto è sicuro.
+  const buono = (abbinamento.matchType === "EXACT" || (abbinamento.matchType === "FUZZY" && abbinamento.confidence >= 90))
+    && GRADI_SPECIE.includes(abbinamento.rank);
+  if (!buono) return null;
+
+  // Se il nome è un vecchio sinonimo (es. Rosmarinus officinalis), GBIF ci dà anche la chiave del nome valido oggi
+  // (Salvia rosmarinus): usiamo quella. La "chiave" è il numero con cui GBIF identifica ogni pianta.
+  const chiave = abbinamento.acceptedUsageKey || abbinamento.usageKey;
+
+  // 2) Quattro domande in una volta sola. Promise.all è come ordinare quattro piatti insieme:
+  //    la cucina li prepara in parallelo e noi aspettiamo che siano pronti tutti, invece di uno alla volta.
+  const [specie, nomi, mondo, italia] = await Promise.all([
+    fetch(GBIF + "/species/" + chiave).then((r) => r.json()),                        // la scheda della pianta
+    fetch(GBIF + "/species/" + chiave + "/vernacularNames?limit=300").then((r) => r.json()), // i nomi comuni, in tante lingue
+    // Le segnalazioni nel mondo, contate per paese (facet=country). limit=0: non vogliamo le segnalazioni, solo i conteggi.
+    fetch(GBIF + "/occurrence/search?taxonKey=" + chiave + "&limit=0&facet=country&facetLimit=5").then((r) => r.json()),
+    fetch(GBIF + "/occurrence/search?taxonKey=" + chiave + "&country=IT&limit=0").then((r) => r.json()) // quante in Italia
+  ]);
+
+  // Dei nomi comuni teniamo solo quelli in italiano ("ita"), senza doppioni.
+  const nomiItaliani = [];
+  for (const n of (nomi.results || [])) {
+    const pulito = (n.vernacularName || "").trim().toLowerCase();
+    if (n.language === "ita" && pulito && !nomiItaliani.includes(pulito)) nomiItaliani.push(pulito);
+  }
+
+  // I paesi con più segnalazioni, già tradotti in italiano.
+  const conteggi = (mondo.facets && mondo.facets[0]) ? mondo.facets[0].counts : [];
+  const paesi = conteggi.map(function (c) {
+    try { return nomiPaesi.of(c.name); } catch (errore) { return c.name; }
+  });
+
+  return {
+    chiave: chiave,
+    latino: specie.canonicalName || abbinamento.canonicalName,
+    sinonimo: abbinamento.status === "SYNONYM" ? abbinamento.canonicalName : "",
+    famiglia: specie.family || abbinamento.family || "",
+    nomiItaliani: nomiItaliani.slice(0, 4),
+    paesi: paesi,
+    inItalia: italia.count || 0
+  };
+}
+
+// GBIF capisce i nomi scientifici, non "rosmarino". Per i nomi comuni chiediamo a Wikipedia italiana
+// come si chiama la voce: su Wikipedia italiana le piante hanno per titolo il nome scientifico.
+// Es. "rosmarino" → "Salvia rosmarinus". Restituisce "" se non trova nulla.
+async function titoloWikipedia(nome) {
+  const indirizzo = "https://it.wikipedia.org/w/api.php?action=query&prop=pageprops&ppprop=disambiguation"
+    + "&redirects=1&format=json&origin=*&titles=" + encodeURIComponent(nome);
+  const dati = await (await fetch(indirizzo)).json();
+  const pagina = Object.values(dati.query.pages)[0];
+  if (pagina.missing !== undefined) return "";
+  if (pagina.pageprops && pagina.pageprops.disambiguation !== undefined) return "";
+  return pagina.title;
+}
+
+// Il "regista" della scheda: cerca su GBIF e poi prepara la scheda. Se GBIF non trova, usa Wikipedia.
+// aMano = true quando il nome l'hai scritto tu (potrebbe essere un nome comune come "rosmarino").
+async function cercaPianta(nome, aMano) {
+  // Ogni ricerca prende un numero. Se mentre aspettiamo ne parte un'altra (tocchi un'altra ipotesi),
+  // quando arriva la risposta vecchia ce ne accorgiamo e la buttiamo, invece di sovrascrivere quella nuova.
+  const questaRicerca = ++ricercaAttuale;
+  $("scheda").hidden = true;
+  mostraStato("Cerco «" + nome + "» su GBIF…");
+
+  let gbif = null;
+  try {
+    gbif = await chiediAGBIF(nome);
+    if (!gbif && aMano) {
+      const titolo = await titoloWikipedia(nome);
+      if (titolo) gbif = await chiediAGBIF(titolo);
+    }
+  } catch (errore) {
+    gbif = null;   // GBIF non risponde (niente rete o sportello chiuso): andremo di riserva su Wikipedia
+  }
+  if (questaRicerca !== ricercaAttuale) return;   // risposta vecchia: la ignoriamo
+
+  $("stato").hidden = true;
+  preparaScheda(gbif, nome);
+}
+
+// Riempie la scheda: titolo, targhette, dati di GBIF, link, bottone Aggiungi e (chiusa) la riserva Wikipedia.
+function preparaScheda(gbif, nome) {
+  const e = esemplareCorrente;
+  if (gbif) {
+    // Usiamo il nome scientifico valido oggi secondo GBIF, e i nomi italiani se non li abbiamo già (da Pl@ntNet).
+    e.specie = gbif.latino;
+    if (!e.comune) e.comune = gbif.nomiItaliani.slice(0, 3).join(", ");
+    if (nelErbario(e.id)) salvaEsemplare(e);
+  } else if (!e.specie) {
+    e.specie = nome;
+  }
+  compilaCartellino(e);
+
+  $("scheda-sottotitolo").textContent = e.comune;
+  $("scheda-titolo").textContent = e.specie;
+  disegnaTarghette();
+  aggiornaAggiungi();
+
+  // Il riquadro di GBIF
+  $("dati-gbif").hidden = !gbif;
+  if (gbif) mostraDatiGBIF(gbif);
+
+  // Acta Plantarum non ha uno sportello per le app, quindi non possiamo chiedergli i dati.
+  // Usiamo un trucco: DuckDuckGo con "!ducky" apre direttamente il PRIMO risultato della ricerca,
+  // e con "site:actaplantarum.org" cerca solo dentro Acta Plantarum.
+  $("link-acta").href = "https://duckduckgo.com/?q=" + encodeURIComponent("!ducky site:actaplantarum.org " + e.specie);
+
+  // La riserva: Wikipedia. Se GBIF ha risposto resta chiusa e si carica solo se la apri;
+  // se GBIF non ha trovato niente, la apriamo e la carichiamo subito.
+  const wiki = $("wiki");
+  wiki.dataset.nome = e.specie;
+  wiki.dataset.caricata = "";
+  $("wiki-fonte").textContent = gbif ? "" : "GBIF non ha trovato questa pianta: ecco Wikipedia, la nostra riserva.";
+  $("wiki-testo").replaceChildren();
+  $("scheda-immagine").hidden = true;
+  $("scheda-link").hidden = true;
+  wiki.open = !gbif;
+  $("scheda").hidden = false;
+  if (!gbif) caricaWikipedia();
+}
+
+// Scrive le righe del riquadro "Dati da GBIF".
+function mostraDatiGBIF(g) {
+  const dl = $("gbif-dati");
+  dl.replaceChildren();
+  function riga(etichetta, valore) {   // una funzione dentro una funzione: serve solo qui
+    if (!valore) return;               // niente valore, niente riga
+    const dt = document.createElement("dt");
+    const dd = document.createElement("dd");
+    dt.textContent = etichetta;
+    dd.textContent = valore;
+    dl.append(dt, dd);
+  }
+  riga("Famiglia", g.famiglia);
+  riga("Nomi italiani", g.nomiItaliani.join(", "));
+  riga("Sinonimo", g.sinonimo);
+  riga("Più segnalata in", g.paesi.join(", "));
+  riga("Segnalazioni in Italia", g.inItalia.toLocaleString("it-IT"));   // 12345 → "12.345"
+  $("link-gbif").href = "https://www.gbif.org/species/" + g.chiave;
+}
+
+// Quando apri la riserva Wikipedia ("toggle" = si è aperta o chiusa), la carichiamo, una volta sola.
+$("wiki").addEventListener("toggle", function () {
+  if ($("wiki").open) caricaWikipedia();
+});
+
+// --- IL FORNITORE DI RISERVA: Wikipedia ---
 // "async" vuol dire che la funzione deve ASPETTARE una risposta da internet.
 // "await" è il punto in cui aspetta, come un cameriere che attende il piatto dalla cucina.
-async function cercaSuWikipedia(nome, chiHaIdentificato) {
-  mostraStato("Cerco «" + nome + "» su Wikipedia…");
-  $("scheda").hidden = true;
+async function caricaWikipedia() {
+  const wiki = $("wiki");
+  if (wiki.dataset.caricata) return;   // già caricata (o in caricamento): non la chiediamo di nuovo
+  wiki.dataset.caricata = "sì";
+  const nome = wiki.dataset.nome;
+  const questaRicerca = ricercaAttuale;
+  const avviso = $("wiki-fonte").textContent;   // l'eventuale "GBIF non ha trovato…" lo teniamo
+  $("wiki-fonte").textContent = "Cerco «" + nome + "» su Wikipedia…";
 
   // Proviamo prima la Wikipedia italiana, poi quella inglese (più ricca sulle piante rare).
   for (const lingua of ["it", "en"]) {
-    // Il NUOVO indirizzo. Dopo il "?" ci sono le istruzioni per Wikipedia, separate da "&".
+    // Dopo il "?" ci sono le istruzioni per Wikipedia, separate da "&".
     // Ognuna è una coppia nome=valore, come le voci di un modulo d'ordine.
     const indirizzo = "https://" + lingua + ".wikipedia.org/w/api.php"
       + "?action=query"                        // voglio informazioni su una pagina
@@ -663,48 +972,49 @@ async function cercaSuWikipedia(nome, chiHaIdentificato) {
       + "&titles=" + encodeURIComponent(nome); // il nome cercato, con spazi e accenti resi validi
 
     try {
-      const risposta = await fetch(indirizzo);   // 1) mandiamo la richiesta e aspettiamo
-      const dati = await risposta.json();        // 2) trasformiamo la risposta in dati utilizzabili
-
-      // 3) Wikipedia mette la pagina dentro dati.query.pages, sotto un numero che non
-      //    conosciamo in anticipo. Object.values(...)[0] vuol dire "prendi il primo, qualunque sia il suo nome".
+      const risposta = await fetch(indirizzo);
+      const dati = await risposta.json();
+      if (questaRicerca !== ricercaAttuale) return;   // nel frattempo hai cercato un'altra pianta
+      // Wikipedia mette la pagina dentro dati.query.pages, sotto un numero che non conosciamo in anticipo.
+      // Object.values(...)[0] vuol dire "prendi il primo, qualunque sia il suo nome".
       const pagina = Object.values(dati.query.pages)[0];
-
       if (pagina.missing !== undefined) continue;  // la voce non esiste: proviamo l'altra lingua
       if (pagina.pageprops && pagina.pageprops.disambiguation !== undefined) continue; // più significati: non ci serve
-
-      mostraScheda(pagina, lingua, chiHaIdentificato);
-      return;                                    // trovato: usciamo dalla funzione
+      mostraWikipedia(pagina, lingua, avviso);
+      return;
     } catch (errore) {
-      mostraStato("Non riesco a contattare Wikipedia. Controlla la connessione e riprova.", true);
+      $("wiki-fonte").textContent = "Non riesco a contattare Wikipedia. Controlla la connessione e riprova.";
+      wiki.dataset.caricata = "";   // così se la richiudi e riapri, riprova
       return;
     }
   }
-  mostraStato("Nessuna voce trovata per «" + nome + "». Prova con il nome scientifico, per esempio «Laurus nobilis».", true);
+  $("wiki-fonte").textContent = "Nessuna voce trovata su Wikipedia per «" + nome + "».";
 }
 
-// --- 4. METTERE I DATI NELLA PAGINA ---
 // Le sezioni di Wikipedia che non c'entrano con la pianta: le saltiamo.
 const SEZIONI_DA_SALTARE = ["Note", "Bibliografia", "Voci correlate", "Altri progetti", "Collegamenti esterni",
   "Galleria d'immagini", "References", "See also", "External links", "Further reading", "Gallery", "Notes"];
 
-function mostraScheda(pagina, lingua, chiHaIdentificato) {
-  // NOVITÀ: se la voce arriva dalla Wikipedia inglese, la traduciamo.
+function mostraWikipedia(pagina, lingua, avviso) {
+  // Se la voce arriva dalla Wikipedia inglese, la traduciamo.
   const daTradurre = (lingua === "en");
-
-  $("stato").hidden = true;
-  $("scheda-titolo").textContent = pagina.title;
-  $("scheda-sottotitolo").textContent = daTradurre ? "Wikipedia EN · tradotto automaticamente" : "Wikipedia IT";
-  $("scheda-comune").textContent = "Nome comune: " + nomeComune;
-  $("scheda-comune").hidden = (nomeComune === "");
+  $("wiki-fonte").textContent = (avviso ? avviso + " " : "")
+    + (daTradurre ? "Wikipedia EN · tradotto automaticamente" : "Wikipedia IT");
   $("scheda-link").href = "https://" + lingua + ".m.wikipedia.org/wiki/" + encodeURIComponent(pagina.title.replaceAll(" ", "_"));
+  $("scheda-link").hidden = false;
 
   if (pagina.thumbnail) {
     $("scheda-immagine").src = pagina.thumbnail.source;
     $("scheda-immagine").alt = pagina.title;
     $("scheda-immagine").hidden = false;
-  } else {
-    $("scheda-immagine").hidden = true;
+  }
+
+  // Se GBIF non conosceva la pianta e non è ancora nell'erbario, prendiamo il titolo di Wikipedia come nome.
+  const e = esemplareCorrente;
+  if ($("dati-gbif").hidden && !nelErbario(e.id)) {
+    e.specie = pagina.title;
+    $("scheda-titolo").textContent = e.specie;
+    compilaCartellino(e);
   }
 
   // Il testo arriva tutto attaccato, con i titoli delle sezioni scritti così:  == Descrizione ==
@@ -712,8 +1022,8 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
   // [introduzione, titolo 1, testo 1, titolo 2, testo 2, ...]
   const pezzi = pagina.extract.split(/\n*={2,}\s*(.+?)\s*={2,}\n*/);
 
-  const contenitore = $("scheda-testo");
-  contenitore.replaceChildren();          // svuotiamo la scheda della ricerca precedente
+  const contenitore = $("wiki-testo");
+  contenitore.replaceChildren();
   aggiungiParagrafi(contenitore, pezzi[0], daTradurre); // l'introduzione, sempre visibile (tradotta subito)
 
   // Poi ogni sezione, dentro un <details>: un elemento HTML che si apre e si chiude toccandolo.
@@ -722,17 +1032,16 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
     const testo = (pezzi[i + 1] || "").trim();
     if (testo === "" || SEZIONI_DA_SALTARE.includes(titolo)) continue;
 
-    const sezione = document.createElement("details");   // creiamo un elemento nuovo...
-    const etichetta = document.createElement("summary"); // ...con la sua etichetta cliccabile
+    const sezione = document.createElement("details");
+    const etichetta = document.createElement("summary");
     etichetta.textContent = titolo;
     sezione.append(etichetta);
     aggiungiParagrafi(sezione, testo, false);
-    contenitore.append(sezione);                         // ...e lo mettiamo nella pagina
+    contenitore.append(sezione);
 
     if (daTradurre) {
       traduciInPagina(etichetta, titolo);                // il titolo della sezione lo traduciamo subito
-      // Il testo della sezione invece SOLO quando la apri (evento "toggle"):
-      // così non sprechiamo traduzioni su sezioni che magari non leggerai.
+      // Il testo della sezione invece SOLO quando la apri: così non sprechiamo traduzioni.
       sezione.addEventListener("toggle", function () {
         if (!sezione.open || sezione.dataset.tradotta) return;
         sezione.dataset.tradotta = "sì";
@@ -740,10 +1049,6 @@ function mostraScheda(pagina, lingua, chiHaIdentificato) {
       });
     }
   }
-
-  $("specie").textContent = pagina.title;
-  $("det").textContent = chiHaIdentificato;
-  $("scheda").hidden = false;
 }
 
 // Trasforma un blocco di testo in paragrafi, uno per ogni "a capo".
@@ -772,7 +1077,7 @@ async function traduciInPagina(elemento, testo) {
     elemento.textContent = await traduci(testo);
   } catch (errore) {
     // Traduzione non riuscita (di solito: limite giornaliero finito). Lasciamo l'inglese.
-    $("scheda-sottotitolo").textContent = "Wikipedia EN · traduzione non disponibile ora, testo originale";
+    $("wiki-fonte").textContent = "Wikipedia EN · traduzione non disponibile ora, testo originale";
   }
   elemento.classList.remove("in-traduzione");
 }
