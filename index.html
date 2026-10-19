@@ -6,38 +6,46 @@
 <title>Erbario Tascabile</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icona-180.png">
-<meta name="theme-color" content="#2f6b3f">
+<!-- NOVITÀ tappa 5: la barra del telefono diventa nera, come l'app -->
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Erbario">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- NOVITÀ tappa 5: niente più font scaricati da Google. Usiamo quelli già nel telefono
+     (i "font di sistema"): l'app si apre prima e consuma meno dati. -->
 
 <!--
   ============================================================
-  ERBARIO TASCABILE · Tappa 2: il primo fornitore (Wikipedia)
+  ERBARIO TASCABILE · Tappa 5: tema scuro, tre pagine, sfondo di foglie
   ============================================================
-  Novità rispetto alla tappa 1:
-   - un campo dove scrivere il nome di una pianta
-   - la funzione cercaSuWikipedia(), che "ordina" la scheda a Wikipedia
-  Questo file si chiama index.html: è il nome che i siti usano
-  per la pagina principale. GitHub Pages lo apre da solo.
+  Novità rispetto alla tappa 4:
+   - tema scuro a basso consumo: sfondo nero vero (#000000).
+     Sugli schermi OLED un pixel nero è un pixel SPENTO: meno batteria.
+   - font di sistema al posto dei font di Google
+   - una barra in basso con tre pagine: Riconosci, Erbario, Luoghi
+     (Luoghi per ora è un segnaposto: lo riempiremo in una prossima tappa)
+   - uno sfondo di foglie disegnate a linee, fatto in SVG
+  La parte che fa le cose (foto, Pl@ntNet, Wikipedia, erbario) è la stessa della tappa 4.
 -->
 
 <style>
-/* ---------- CSS: l'aspetto (uguale alla tappa 1, più la scheda) ---------- */
+/* ---------- CSS: l'aspetto ---------- */
+/* Le "variabili" (--nome) sono i colori e i font dell'app, scritti una volta sola.
+   NOVITÀ: ora c'è solo il tema scuro, quindi niente più @media (prefers-color-scheme). */
 :root {
-  --carta: #f3f5ef; --inchiostro: #1d2a22; --clorofilla: #2f6b3f;
-  --linfa: #e4ebdf; --matita: #6b776e; --bordo: #c9d3c6; --errore: #9a3b2e;
-  --f-titolo: "Young Serif", Georgia, serif;
-  --f-testo: "Atkinson Hyperlegible", system-ui, sans-serif;
-  --f-etichetta: "IBM Plex Mono", ui-monospace, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --carta: #141b16; --inchiostro: #e3eae1; --clorofilla: #7fbf8c;
-    --linfa: #1f2a22; --matita: #9aa79d; --bordo: #33433a; --errore: #e08a7a;
-    color-scheme: dark;
-  }
+  --carta: #000000;                  /* lo sfondo: nero vero */
+  --superficie: rgba(12, 17, 14, .92); /* i riquadri: quasi neri e quasi opachi, così coprono le foglie */
+  --inchiostro: #e3eae1;             /* il testo */
+  --clorofilla: #7fbf8c;             /* il verde dei bottoni e dei dettagli */
+  --linfa: #16201a;                  /* fondo della cornice foto e delle barre */
+  --matita: #9aa79d;                 /* il testo secondario */
+  --bordo: #26332b;                  /* le linee sottili */
+  --errore: #e08a7a;
+  /* Font di sistema: il browser prende il primo della lista che trova nel telefono. */
+  --f-titolo: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --f-testo: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-etichetta: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;   /* dice al browser di disegnare scuri anche i suoi pezzi (barre di scorrimento, campi) */
 }
 * { box-sizing: border-box; }
 body {
@@ -46,9 +54,21 @@ body {
 }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
+
+/* ---------- NOVITÀ: lo sfondo di foglie ---------- */
+/* È un disegno SVG fermo dietro a tutto (position: fixed), che non si muove quando scorri.
+   z-index: -1 lo mette "sotto" i contenuti; pointer-events: none fa passare i tocchi attraverso.
+   opacity lo rende tenue: le foglie si intravedono, non disturbano. */
+.sfondo {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  z-index: -1; pointer-events: none; opacity: .5;
+}
+
 .pagina {
   max-width: 30rem; margin: 0 auto;
-  padding-block: max(2rem, env(safe-area-inset-top, 0px)) 3rem;
+  padding-top: max(2rem, env(safe-area-inset-top, 0px));
+  /* NOVITÀ: in fondo lasciamo spazio per la barra delle pagine, che altrimenti coprirebbe l'ultima riga */
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-direction: column; gap: 1.5rem;
@@ -56,17 +76,18 @@ img { max-width: 100%; }
 .occhiello { font-family: var(--f-etichetta); font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--matita); }
 h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-height: 1.05; margin: .25rem 0 0; }
 .intro { color: var(--matita); margin: 0; }
+.testata { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 
-.cornice { aspect-ratio: 4 / 5; border: 1.5px dashed var(--bordo); border-radius: 4px; background: var(--linfa); display: grid; place-items: center; overflow: hidden; }
+.cornice { aspect-ratio: 4 / 5; border: 1.5px dashed var(--bordo); border-radius: 8px; background: var(--linfa); display: grid; place-items: center; overflow: hidden; }
 .cornice img { width: 100%; height: 100%; object-fit: cover; }
-.cornice.piena { border-style: solid; border-color: var(--inchiostro); }
+.cornice.piena { border-style: solid; border-color: var(--bordo); }
 .vuoto { text-align: center; color: var(--matita); padding: 1.5rem; }
 .vuoto svg { width: 4.5rem; height: 4.5rem; stroke: var(--clorofilla); fill: none; stroke-width: 1.4; }
 
 #scatto { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .bottone {
   display: flex; align-items: center; justify-content: center; gap: .6rem;
-  background: var(--clorofilla); color: var(--carta); border: 0;
+  background: var(--clorofilla); color: #000; border: 0;   /* testo nero sul verde: si legge meglio */
   font: 700 1.05rem var(--f-testo); padding: 1rem 1.25rem; border-radius: 999px; cursor: pointer;
 }
 .bottone svg { width: 1.3rem; height: 1.3rem; stroke: currentColor; fill: none; stroke-width: 2; }
@@ -76,14 +97,14 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .ricerca { display: flex; gap: .5rem; }
 .ricerca input {
   flex: 1; min-width: 0; font: 1rem var(--f-testo); padding: .8rem 1rem;
-  border: 1.5px solid var(--bordo); border-radius: 999px; background: var(--carta); color: var(--inchiostro);
+  border: 1.5px solid var(--bordo); border-radius: 999px; background: var(--superficie); color: var(--inchiostro);
 }
 .ricerca input:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: 1px; }
 .ricerca .bottone { padding: .8rem 1.2rem; font-size: 1rem; }
 
 /* Il cartellino d'erbario */
-.cartellino { border: 1.5px solid var(--inchiostro); border-radius: 2px; font-family: var(--f-etichetta); font-size: .82rem; }
-.cartellino header { border-bottom: 1.5px solid var(--inchiostro); padding: .5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; letter-spacing: .1em; text-transform: uppercase; font-size: .7rem; }
+.cartellino { border: 1.5px solid var(--bordo); border-radius: 8px; background: var(--superficie); font-family: var(--f-etichetta); font-size: .82rem; }
+.cartellino header { border-bottom: 1.5px solid var(--bordo); padding: .5rem .8rem; display: flex; justify-content: space-between; gap: 1rem; letter-spacing: .1em; text-transform: uppercase; font-size: .7rem; color: var(--matita); }
 .cartellino dl { margin: 0; display: grid; grid-template-columns: auto 1fr; }
 .cartellino dt, .cartellino dd { padding: .5rem .8rem; border-bottom: 1px solid var(--bordo); margin: 0; }
 .cartellino dt { color: var(--matita); text-transform: uppercase; font-size: .68rem; letter-spacing: .08em; align-self: center; }
@@ -91,27 +112,27 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .cartellino dl > :nth-last-child(-n+2) { border-bottom: 0; }
 .specie { font-family: var(--f-titolo); font-size: 1.05rem; font-style: italic; }
 
-/* La scheda che arriva da Wikipedia */
-.scheda { display: flex; flex-direction: column; gap: .75rem; }
+/* La scheda che arriva da Wikipedia: ora sta in un riquadro, così il testo lungo non ha foglie dietro */
+.scheda { display: flex; flex-direction: column; gap: .75rem; background: var(--superficie); border: 1.5px solid var(--bordo); border-radius: 8px; padding: 1rem; }
 .scheda h2 { font-family: var(--f-titolo); font-weight: 400; font-size: 1.6rem; margin: 0; line-height: 1.15; }
 .scheda .sottotitolo { font-family: var(--f-etichetta); font-size: .75rem; color: var(--matita); text-transform: uppercase; letter-spacing: .08em; }
-.scheda img { border-radius: 4px; border: 1px solid var(--bordo); max-height: 18rem; object-fit: cover; width: 100%; }
+.scheda img { border-radius: 6px; border: 1px solid var(--bordo); max-height: 18rem; object-fit: cover; width: 100%; }
 .scheda p { margin: 0; }
 .scheda a { color: var(--clorofilla); font-weight: 700; }
 .stato { font-size: .9rem; color: var(--matita); margin: 0; }
 .stato.errore { color: var(--errore); }
 
-/* NOVITÀ tappa 3: le ipotesi di Pl@ntNet, come pulsanti con la percentuale */
+/* Le ipotesi di Pl@ntNet, come pulsanti con la percentuale */
 .ipotesi { display: flex; flex-direction: column; gap: .5rem; }
 .ipotesi h3 { font-family: var(--f-etichetta); font-weight: 500; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; color: var(--matita); margin: 0; }
 .candidato {
   display: grid; grid-template-columns: 1fr auto; gap: .15rem 1rem; align-items: baseline;
   text-align: left; width: 100%; cursor: pointer;
-  background: var(--carta); color: var(--inchiostro);
-  border: 1.5px solid var(--bordo); border-radius: 6px; padding: .65rem .85rem;
+  background: var(--superficie); color: var(--inchiostro);
+  border: 1.5px solid var(--bordo); border-radius: 8px; padding: .65rem .85rem;
   font: inherit;
 }
-.candidato.scelto { border-color: var(--clorofilla); background: var(--linfa); }
+.candidato.scelto { border-color: var(--clorofilla); }
 .candidato:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: 2px; }
 .candidato .latino { font-family: var(--f-titolo); font-style: italic; min-width: 0; overflow-wrap: anywhere; }
 .candidato .punteggio { font-family: var(--f-etichetta); font-variant-numeric: tabular-nums; color: var(--clorofilla); font-weight: 500; }
@@ -119,39 +140,116 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 .barra { grid-column: 1 / -1; height: 4px; background: var(--linfa); border-radius: 2px; overflow: hidden; }
 .barra span { display: block; height: 100%; background: var(--clorofilla); }
 
-/* NOVITÀ: nome comune e traduzione */
+/* Nome comune e traduzione */
 .scheda .nome-comune { font-size: 1.05rem; margin-top: .2rem; }
 .in-traduzione { opacity: .5; }
 .scheda details { border-top: 1px solid var(--bordo); padding-block: .6rem; }
 .scheda summary { cursor: pointer; font-weight: 700; }
 .scheda details p { margin-top: .5rem; }
 
-/* NOVITÀ tappa 4: l'erbario */
-.erbario { border-top: 1.5px solid var(--inchiostro); padding-top: 1rem; display: flex; flex-direction: column; gap: .75rem; }
-.erbario-testata { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
-.erbario h2 { font-family: var(--f-titolo); font-weight: 400; font-size: 1.5rem; margin: 0; }
+/* L'erbario: ora ha una pagina tutta sua */
 .elenco-erbario { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-.voce { display: flex; align-items: stretch; border: 1.5px solid var(--bordo); border-radius: 6px; overflow: hidden; }
+.voce { display: flex; align-items: stretch; border: 1.5px solid var(--bordo); border-radius: 8px; overflow: hidden; background: var(--superficie); }
 .voce .apri {
   flex: 1; min-width: 0; display: flex; gap: .8rem; align-items: center; text-align: left;
-  background: var(--carta); color: var(--inchiostro); border: 0; padding: .5rem; font: inherit; cursor: pointer;
+  background: transparent; color: var(--inchiostro); border: 0; padding: .5rem; font: inherit; cursor: pointer;
 }
-.voce img { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: 4px; flex: none; background: var(--linfa); }
+.voce img { width: 3.5rem; height: 3.5rem; object-fit: cover; border-radius: 6px; flex: none; background: var(--linfa); }
 .voce .testi { display: flex; flex-direction: column; min-width: 0; }
 .voce .latino { font-family: var(--f-titolo); font-style: italic; overflow-wrap: anywhere; }
 .voce .comune { font-size: .85rem; color: var(--matita); }
 .voce .quando { font-family: var(--f-etichetta); font-size: .7rem; color: var(--matita); font-variant-numeric: tabular-nums; }
-.voce .elimina { background: var(--carta); color: var(--matita); border: 0; border-left: 1px solid var(--bordo); padding: 0 .9rem; font-size: 1.3rem; cursor: pointer; }
+.voce .elimina { background: transparent; color: var(--matita); border: 0; border-left: 1px solid var(--bordo); padding: 0 .9rem; font-size: 1.3rem; cursor: pointer; }
 .voce .apri:focus-visible, .voce .elimina:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: -3px; }
+
+/* La pagina Luoghi, per ora un segnaposto */
+.segnaposto { background: var(--superficie); border: 1.5px dashed var(--bordo); border-radius: 8px; padding: 1.25rem; color: var(--matita); }
+.segnaposto p { margin: 0; }
+.segnaposto p + p { margin-top: .75rem; }
+
+/* ---------- NOVITÀ: la barra delle pagine, in basso ---------- */
+/* position: fixed + bottom: 0 = incollata al fondo dello schermo, anche quando scorri.
+   env(safe-area-inset-bottom) è lo spazio della "linguetta" dell'iPhone: la barra ci sta sopra. */
+.schede {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; justify-content: center;
+  background: var(--carta); border-top: 1px solid var(--bordo);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.schede a {
+  flex: 1; max-width: 10rem;
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+  padding: .6rem 0 .7rem; text-decoration: none;
+  color: var(--matita); font-size: .78rem;
+}
+.schede svg { width: 1.5rem; height: 1.5rem; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+/* La pagina in cui sei è verde e in grassetto. aria-current lo mette il JavaScript. */
+.schede a[aria-current="page"] { color: var(--clorofilla); font-weight: 700; }
+.schede a:focus-visible { outline: 3px solid var(--clorofilla); outline-offset: -3px; }
 </style>
 </head>
 
 <body>
 <!-- ---------- HTML: la struttura ---------- -->
-<main class="pagina">
+
+<!-- NOVITÀ: lo sfondo di foglie, disegnato in SVG.
+     Funziona come una carta da parati, in tre passi:
+      1. in <defs> disegniamo i "timbri" (symbol): una foglia d'acero, un rametto, una foglia ovale.
+         Ogni timbro è disegnato in un quadrato 100×100 e ha solo il contorno (fill="none").
+      2. dentro <pattern> stampiamo i timbri con <use>, ognuno con posizione, grandezza,
+         rotazione e colore diversi. Il pattern è una "piastrella" di 400×560.
+      3. il <rect> finale copre tutto lo schermo e si riempie ripetendo la piastrella.
+     I colori: verde scuro #2e5d3c, giallo autunnale #8f6d1f, bordeaux #6e2233.
+     vector-effect="non-scaling-stroke" tiene la linea sottile uguale anche sulle foglie grandi. -->
+<svg class="sfondo" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="acero" viewBox="0 0 100 100">
+      <path vector-effect="non-scaling-stroke" d="M50 72 L58 74 L72 78 L70 70 L86 64 L80 58 L92 46 L80 44 L84 32 L70 38 L68 30 L60 40 L62 22 L56 24 L50 8 L44 24 L38 22 L40 40 L32 30 L30 38 L16 32 L20 44 L8 46 L20 58 L14 64 L30 70 L28 78 L42 74 Z"/>
+      <path vector-effect="non-scaling-stroke" d="M50 95 L50 14 M50 72 L82 48 M50 72 L18 48 M50 72 L72 72 M50 72 L28 72"/>
+    </symbol>
+    <path id="fogliolina" vector-effect="non-scaling-stroke" d="M0 0 C5 -6 15 -6 20 0 C15 6 5 6 0 0 Z M0 0 L20 0"/>
+    <symbol id="rametto" viewBox="0 0 100 100">
+      <path vector-effect="non-scaling-stroke" d="M10 92 C35 66 60 40 88 12"/>
+      <use href="#fogliolina" transform="translate(26 75) rotate(-100)"/>
+      <use href="#fogliolina" transform="translate(30 71) rotate(10)"/>
+      <use href="#fogliolina" transform="translate(42 59) rotate(-100)"/>
+      <use href="#fogliolina" transform="translate(46 55) rotate(10)"/>
+      <use href="#fogliolina" transform="translate(58 43) rotate(-100)"/>
+      <use href="#fogliolina" transform="translate(62 39) rotate(10)"/>
+      <use href="#fogliolina" transform="translate(74 27) rotate(-100)"/>
+      <use href="#fogliolina" transform="translate(77 24) rotate(10)"/>
+      <use href="#fogliolina" transform="translate(88 12) rotate(-45)"/>
+    </symbol>
+    <symbol id="ovale" viewBox="0 0 100 100">
+      <path vector-effect="non-scaling-stroke" d="M50 92 C18 70 20 30 50 8 C80 30 82 70 50 92 Z"/>
+      <path vector-effect="non-scaling-stroke" d="M50 98 L50 14 M50 70 L34 56 M50 70 L66 56 M50 50 L36 36 M50 50 L64 36 M50 32 L42 24 M50 32 L58 24"/>
+    </symbol>
+
+    <pattern id="foglie" width="400" height="560" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
+        <!-- x e y = dove sta il timbro, width/height = quanto è grande, rotate(gradi cx cy) = di quanto è girato attorno al suo centro -->
+        <use href="#acero"   x="20"  y="10"  width="90"  height="90"  stroke="#8f6d1f" transform="rotate(-15 65 55)"/>
+        <use href="#acero"   x="260" y="30"  width="50"  height="50"  stroke="#6e2233" transform="rotate(20 285 55)"/>
+        <use href="#ovale"   x="170" y="60"  width="40"  height="40"  stroke="#8f6d1f" transform="rotate(-40 190 80)"/>
+        <use href="#rametto" x="200" y="180" width="140" height="140" stroke="#2e5d3c"/>
+        <use href="#ovale"   x="40"  y="250" width="60"  height="60"  stroke="#2e5d3c" transform="rotate(30 70 280)"/>
+        <use href="#ovale"   x="350" y="250" width="35"  height="35"  stroke="#6e2233" transform="rotate(60 367 267)"/>
+        <use href="#acero"   x="300" y="330" width="80"  height="80"  stroke="#2e5d3c" transform="rotate(10 340 370)"/>
+        <use href="#rametto" x="10"  y="400" width="150" height="150" stroke="#6e2233" transform="rotate(8 85 475)"/>
+        <use href="#acero"   x="230" y="470" width="45"  height="45"  stroke="#8f6d1f" transform="rotate(-25 252 492)"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#foglie)"/>
+</svg>
+
+<!-- ============ PAGINA 1: RICONOSCI ============
+     NOVITÀ: ogni pagina è una <main> con un id. Il JavaScript ne mostra una sola alla volta
+     (le altre hanno l'attributo hidden). -->
+<main class="pagina" id="pagina-riconosci">
   <div>
-    <div class="occhiello">Tappa 4 · l'erbario</div>
-    <h1>Erbario Tascabile</h1>
+    <div class="occhiello">Erbario Tascabile</div>
+    <h1>Riconosci</h1>
   </div>
   <p class="intro">Fotografa una foglia o un fiore, da vicino e a fuoco. Pl@ntNet riconosce la pianta e l'app ti porta la scheda. Puoi anche scrivere il nome a mano.</p>
 
@@ -169,7 +267,6 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <span id="testo-bottone">Fotografa una pianta</span>
   </label>
 
-  <!-- NOVITÀ: un modulo (form) con un campo di testo e un bottone -->
   <form class="ricerca" id="ricerca">
     <input id="nome" type="text" placeholder="Es. Pistacia lentiscus o rosmarino" aria-label="Nome della pianta" autocomplete="off">
     <button class="bottone" type="submit">Cerca</button>
@@ -187,13 +284,11 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
 
   <p class="stato" id="stato" hidden></p>
 
-  <!-- NOVITÀ tappa 3: qui compaiono le ipotesi di Pl@ntNet -->
   <section class="ipotesi" id="ipotesi" hidden>
     <h3>Ipotesi di Pl@ntNet · tocca per cambiare</h3>
     <div class="ipotesi" id="elenco-ipotesi"></div>
   </section>
 
-  <!-- NOVITÀ: qui compare la scheda che arriva da Wikipedia -->
   <article class="scheda" id="scheda" hidden>
     <div>
       <div class="sottotitolo" id="scheda-sottotitolo"></div>
@@ -204,17 +299,48 @@ h1 { font-family: var(--f-titolo); font-weight: 400; font-size: 2.4rem; line-hei
     <div id="scheda-testo"></div>
     <a id="scheda-link" target="_blank" rel="noopener">Leggi la voce completa su Wikipedia</a>
   </article>
-
-  <!-- NOVITÀ tappa 4: l'erbario, cioè lo storico delle piante trovate -->
-  <section class="erbario" aria-labelledby="titolo-erbario">
-    <div class="erbario-testata">
-      <h2 id="titolo-erbario">Il mio erbario</h2>
-      <span class="occhiello" id="conta-erbario">0 esemplari</span>
-    </div>
-    <p class="stato" id="erbario-vuoto">Qui compariranno le piante che fotografi. Restano salvate su questo telefono.</p>
-    <ul class="elenco-erbario" id="elenco-erbario"></ul>
-  </section>
 </main>
+
+<!-- ============ PAGINA 2: ERBARIO ============
+     È la stessa lista della tappa 4, spostata in una pagina tutta sua. -->
+<main class="pagina" id="pagina-erbario" hidden>
+  <div class="testata">
+    <h1>Il mio erbario</h1>
+    <span class="occhiello" id="conta-erbario">0 esemplari</span>
+  </div>
+  <p class="stato" id="erbario-vuoto">Qui compariranno le piante che fotografi. Restano salvate su questo telefono.</p>
+  <ul class="elenco-erbario" id="elenco-erbario"></ul>
+</main>
+
+<!-- ============ PAGINA 3: LUOGHI (segnaposto) ============ -->
+<main class="pagina" id="pagina-luoghi" hidden>
+  <div class="testata">
+    <h1>Luoghi</h1>
+  </div>
+  <div class="segnaposto">
+    <p>Qui potrai creare i tuoi luoghi, per esempio Villa Pamphili, Campagna o Sutri, e vedere quali piante hai trovato in ognuno.</p>
+    <p>Questa pagina la costruiremo in una delle prossime tappe.</p>
+  </div>
+</main>
+
+<!-- ============ NOVITÀ: LA BARRA DELLE PAGINE ============
+     Ogni voce è un semplice link a un "segnalibro" dell'indirizzo: #riconosci, #erbario, #luoghi.
+     La parte dopo il # si chiama "hash": cambiarla NON ricarica la pagina, ma il JavaScript se ne accorge
+     e mostra la pagina giusta. Bonus: il tasto "indietro" del telefono torna alla pagina di prima. -->
+<nav class="schede" aria-label="Pagine dell'app">
+  <a href="#riconosci" id="link-riconosci">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    <span>Riconosci</span>
+  </a>
+  <a href="#erbario" id="link-erbario">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M12 17v-6"/><path d="M12 13c-2.5 0-3.5-1.5-3.5-4 2.5 0 3.5 1.5 3.5 4z"/><path d="M12 12c0-2.5 1-4 3.5-4 0 2.5-1 4-3.5 4z"/></svg>
+    <span>Erbario</span>
+  </a>
+  <a href="#luoghi" id="link-luoghi">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>
+    <span>Luoghi</span>
+  </a>
+</nav>
 
 <script>
 // ---------- JavaScript: il comportamento ----------
@@ -230,6 +356,29 @@ const $ = (id) => document.getElementById(id); // scorciatoia: $("foto") invece 
 let contatore = 0;
 let nomeComune = "";          // il nome comune che ci dà Pl@ntNet, da mostrare nella scheda
 let esemplareCorrente = null; // NOVITÀ: la pianta appena fotografata, da salvare nell'erbario
+
+// ============================================================
+//  NOVITÀ TAPPA 5: LE TRE PAGINE
+// ============================================================
+// Le pagine sono tutte già scritte nell'HTML; noi ne mostriamo una e nascondiamo le altre.
+// Quale mostrare lo decide l'"hash", la parte dell'indirizzo dopo il #  (es. ...index.html#erbario).
+const PAGINE = ["riconosci", "erbario", "luoghi"];
+
+function mostraPagina() {
+  const richiesta = location.hash.slice(1);          // "#erbario" → "erbario" (slice(1) toglie il primo carattere)
+  const scelta = PAGINE.includes(richiesta) ? richiesta : "riconosci";   // hash vuoto o strano: prima pagina
+  for (const nome of PAGINE) {
+    $("pagina-" + nome).hidden = (nome !== scelta);  // nascondi tutte tranne la scelta
+    // aria-current="page" dice "sei qui": il CSS lo colora di verde, e i lettori di schermo lo annunciano
+    if (nome === scelta) $("link-" + nome).setAttribute("aria-current", "page");
+    else $("link-" + nome).removeAttribute("aria-current");
+  }
+  window.scrollTo(0, 0);   // ogni pagina si apre dall'inizio
+}
+
+// "hashchange" scatta ogni volta che cambia la parte dopo il #: tocco sulla barra, tasto indietro, ecc.
+window.addEventListener("hashchange", mostraPagina);
+mostraPagina();   // e una volta subito, all'apertura dell'app
 
 // --- 1. LA FOTO ---
 $("scatto").addEventListener("change", async function () {
@@ -412,7 +561,7 @@ function eliminaEsemplare(id) {
   mostraErbario();
 }
 
-// Disegna l'elenco dell'erbario in fondo alla pagina.
+// Disegna l'elenco dell'erbario nella sua pagina.
 function mostraErbario() {
   const lista = leggiErbario();
   const elenco = $("elenco-erbario");
@@ -448,7 +597,7 @@ function apriEsemplare(e) {
   $("ipotesi").hidden = true;
   compilaCartellino(e);
   nomeComune = e.comune;
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  location.hash = "#riconosci";   // NOVITÀ: l'esemplare si guarda nella pagina Riconosci, quindi ci spostiamo lì
   if (e.specie) cercaSuWikipedia(e.specie, e.det);
 }
 
